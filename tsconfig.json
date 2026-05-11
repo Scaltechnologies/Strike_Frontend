@@ -1,6 +1,18 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
-  }
+    "strict": true,
+    "types": ["nativewind/types"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@assets/*": ["assets/*"]
+    },
+    "ignoreDeprecations": "6.0"
+  },
+  "include": [
+    "src",
+    "*.ts",
+    "*.tsx"
+  ]
 }
