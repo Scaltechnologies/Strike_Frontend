@@ -1,14 +1,16 @@
 import { Tabs } from 'expo-router';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Colors from '../../core/constants/colors';
+
+const PRIMARY = '#CC2200';
+const TEXT_MUTED = '#9BA3AF';
 
 const TABS = [
-  { name: 'home',         label: 'Home',         icon: 'home-outline' as const,        activeIcon: 'home' as const },
-  { name: 'transactions', label: 'Transactions', icon: 'receipt-outline' as const,     activeIcon: 'receipt' as const },
-  { name: 'menu',         label: 'Menu',         icon: 'restaurant-outline' as const,  activeIcon: 'restaurant' as const },
-  { name: 'dashboard',    label: 'Dashboard',    icon: 'grid-outline' as const,        activeIcon: 'grid' as const },
-  { name: 'profile',      label: 'Profile',      icon: 'person-outline' as const,      activeIcon: 'person' as const },
+  { name: 'home',         label: 'Home',         icon: 'home-outline' as const,       activeIcon: 'home' as const },
+  { name: 'transactions', label: 'Transactions', icon: 'receipt-outline' as const,    activeIcon: 'receipt' as const },
+  { name: 'menu',         label: 'Menu',         icon: 'restaurant-outline' as const, activeIcon: 'restaurant' as const },
+  { name: 'dashboard',    label: 'Dashboard',    icon: 'grid-outline' as const,       activeIcon: 'grid' as const },
+  { name: 'profile',      label: 'Profile',      icon: 'person-outline' as const,     activeIcon: 'person' as const },
 ];
 
 function CustomTabBar({ state, navigation }: any) {
@@ -17,8 +19,6 @@ function CustomTabBar({ state, navigation }: any) {
       {state.routes.map((route: any, i: number) => {
         const focused = state.index === i;
         const tab = TABS[i];
-
-        // Safety check (prevents crash if mismatch happens)
         if (!tab) return null;
 
         return (
@@ -31,7 +31,7 @@ function CustomTabBar({ state, navigation }: any) {
             <Ionicons
               name={focused ? tab.activeIcon : tab.icon}
               size={20}
-              color={focused ? '#fff' : Colors.textMuted}
+              color={focused ? '#fff' : TEXT_MUTED}
             />
             <Text style={[styles.label, focused && styles.activeLabel]}>
               {tab.label}
@@ -54,6 +54,15 @@ export default function MainLayout() {
       <Tabs.Screen name="menu" />
       <Tabs.Screen name="dashboard" />
       <Tabs.Screen name="profile" />
+      {/* Stack screens — hidden from tab bar */}
+      <Tabs.Screen name="my-profile"           options={{ href: null }} />
+      <Tabs.Screen name="cards"                options={{ href: null }} />
+      <Tabs.Screen name="card-create"          options={{ href: null }} />
+      <Tabs.Screen name="card-detail"          options={{ href: null }} />
+      <Tabs.Screen name="store-subscriptions"  options={{ href: null }} />
+      <Tabs.Screen name="redemption-history"   options={{ href: null }} />
+      <Tabs.Screen name="redeem"               options={{ href: null }} />
+      <Tabs.Screen name="customer_history"     options={{ href: null }} />
     </Tabs>
   );
 }
@@ -74,23 +83,10 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
   },
   item: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: 14,
-    gap: 3,
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 8, borderRadius: 14, gap: 3,
   },
-  activeItem: {
-    backgroundColor: Colors.primary,
-  },
-  label: {
-    fontSize: 9,
-    color: Colors.textMuted,
-    fontWeight: '500',
-  },
-  activeLabel: {
-    color: '#fff',
-    fontWeight: '700',
-  },
+  activeItem: { backgroundColor: PRIMARY },
+  label:       { fontSize: 9, color: TEXT_MUTED, fontWeight: '500' },
+  activeLabel: { color: '#fff', fontWeight: '700' },
 });

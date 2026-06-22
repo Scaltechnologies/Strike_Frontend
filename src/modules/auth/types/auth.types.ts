@@ -1,12 +1,27 @@
 // src/modules/auth/types/auth.types.ts
 
-export interface SendOtpRequest {
-  phoneNumber: string;
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
 }
 
-export interface SendOtpResponse {
+// Backend: POST /api/auth/vendor/verify response
+export interface VendorAuthResponse {
+  token: string;
+  refreshToken: string;
+  expiresIn: number;
+  vendorId: number;
+  hotelName: string;
+  mobileNumber: string;
+  email: string;
+  address: string;
+  status: 'PENDING' | 'VERIFIED' | 'ACTIVE' | 'SUSPENDED' | 'REJECTED';
   message: string;
-  otpExpiresInSeconds: number;
+}
+
+// Frontend type — UI uses "phoneNumber", service maps to "mobileNumber"
+export interface SendOtpRequest {
+  phoneNumber: string;
 }
 
 export interface VerifyOtpRequest {
@@ -14,33 +29,12 @@ export interface VerifyOtpRequest {
   otp: string;
 }
 
-export interface AuthTokens {
-  accessToken: string;
-  refreshToken: string;
-}
-
-export interface VerifyOtpResponse {
-  tokens: AuthTokens;
-  isNewUser: boolean;
-}
-
-export interface SignupRequest {
+// Backend: POST /api/auth/vendor/register body
+export interface RegisterVendorRequest {
   hotelName: string;
   address: string;
   mobileNumber: string;
-  email: string;
+  email?: string;
   latitude: number;
   longitude: number;
-}
-
-export interface SignupResponse {
-  tokens: AuthTokens;
-  userId: string;
-}
-
-export interface AuthUser {
-  userId: string;
-  name: string;
-  phoneNumber: string;
-  role: 'USER' | 'VENDOR' | 'ADMIN';
 }

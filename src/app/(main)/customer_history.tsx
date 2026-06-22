@@ -1,15 +1,23 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   View, Text, TouchableOpacity, FlatList,
-  StyleSheet, SafeAreaView, StatusBar,
+  StyleSheet, StatusBar,
   Dimensions, ScrollView, Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import Colors from '../../core/constants/colors';
 
-const { width: SW, height: SH } = Dimensions.get('window');
+const Colors = {
+  primary:         '#CC2200',
+  accent:          '#C17B2F',
+  bgWarm:          '#F6F7FA',
+  textDark:        '#1A1A1A',
+  textMuted:       '#5A6272',
+  textPlaceholder: '#9BA3AF',
+};
+
+const { height: SH } = Dimensions.get('window');
 
 // ─── Types ─────────────────────────────────────────────────────────
 type TabType     = 'active' | 'cancelled' | 'history';
@@ -503,7 +511,7 @@ export default function CustomerHistoryScreen() {
       <StatusBar barStyle="dark-content" backgroundColor={Colors.bgWarm} />
 
       {/* ── Header ── */}
-      <SafeAreaView style={styles.header}>
+      <View style={styles.header}>
         <View style={styles.headerRow}>
           <TouchableOpacity
             style={styles.backBtn}
@@ -541,7 +549,7 @@ export default function CustomerHistoryScreen() {
             </TouchableOpacity>
           ))}
         </View>
-      </SafeAreaView>
+      </View>
 
       {/* ── Content ── */}
       <View style={styles.sheet}>

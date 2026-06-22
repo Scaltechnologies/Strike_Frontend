@@ -7,7 +7,7 @@ import {
   Image,
 } from 'react-native';
 import { router } from 'expo-router';
-import LoginImage from '@assets/images/Login.jpg';
+
 
 const { width, height } = Dimensions.get('window');
 
@@ -45,14 +45,7 @@ export default function WelcomeScreen() {
       <View style={styles.bottomCircle} />
 
       {/* Bottom Illustration */}
-      <View style={styles.imageWrapper}>
-        <Image
-          source={LoginImage}
-          style={styles.image}
-          resizeMode="cover"
-        />
-      </View>
-
+      
     </View>
   );
 }

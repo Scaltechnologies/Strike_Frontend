@@ -1,281 +1,344 @@
-import React from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  SafeAreaView, StatusBar, ScrollView, Alert,
+  StatusBar, ScrollView, Alert, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import Colors from '../../core/constants/colors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { clearAll } from '../../core/storage/secureStorage';
+import {
+  getVendorProfile,
+  getVendorProfileStatus,
+} from '../../modules/vendor/services/vendorProfileService';
+import { getMyCards } from '../../modules/cards/services/cardService';
+import type {
+  VendorProfileResponse,
+  VendorProfileStatus,
+} from '../../modules/vendor/types/vendor.types';
 
-// ─── Types ─────────────────────────────────────────────────────────
-interface ProfileRow {
+const DS = {
+  bg:          '#F6F7FA',
+  surface:     '#FFFFFF',
+  border:      '#EAECEF',
+  primary:     '#CC2200',
+  primarySoft: '#FFF0EE',
+  success:     '#16A34A',
+  successSoft: '#F0FDF4',
+  warning:     '#D97706',
+  warningSoft: '#FFFBEB',
+  error:       '#DC2626',
+  errorSoft:   '#FFF1F1',
+  text:        '#1A1A1A',
+  text2:       '#5A6272',
+  text3:       '#9BA3AF',
+};
+
+function statusStyle(s: string): { bg: string; fg: string } {
+  if (s === 'ACTIVE')                       return { bg: DS.successSoft, fg: DS.success };
+  if (s === 'SUSPENDED' || s === 'REJECTED') return { bg: DS.errorSoft,   fg: DS.error   };
+  return { bg: DS.warningSoft, fg: DS.warning };
+}
+
+interface NavRowDef {
   id: string;
   icon: keyof typeof Ionicons.glyphMap;
-  iconBg: string;
-  iconColor: string;
   label: string;
   subtitle?: string;
   onPress: () => void;
+  disabled?: boolean;
 }
 
-// ─── Main Screen ────────────────────────────────────────────────────
+function Section({ title, rows }: { title: string; rows: NavRowDef[] }) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionLabel}>{title}</Text>
+      <View style={styles.sectionCard}>
+        {rows.map((row, idx) => (
+          <View key={row.id}>
+            <TouchableOpacity
+              style={[styles.navRow, row.disabled && styles.navRowDisabled]}
+              onPress={row.onPress}
+              activeOpacity={row.disabled ? 1 : 0.7}
+              disabled={row.disabled}
+            >
+              <View style={styles.navRowIcon}>
+                <Ionicons name={row.icon} size={19} color={row.disabled ? DS.text3 : DS.text2} />
+              </View>
+              <View style={styles.navRowBody}>
+                <Text style={[styles.navRowLabel, row.disabled && { color: DS.text3 }]}>
+                  {row.label}
+                </Text>
+                {!!row.subtitle && (
+                  <Text style={styles.navRowSub}>{row.subtitle}</Text>
+                )}
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={row.disabled ? DS.border : DS.text3}
+              />
+            </TouchableOpacity>
+            {idx < rows.length - 1 && <View style={styles.rowDivider} />}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export default function ProfileScreen() {
-  const router = useRouter();
+  const router   = useRouter();
+  const insets   = useSafeAreaInsets();
+  const [profile, setProfile]     = useState<VendorProfileResponse | null>(null);
+  const [vstatus, setVstatus]     = useState<VendorProfileStatus | null>(null);
+  const [activeCards, setActiveCards] = useState<number | null>(null);
+  const [loading, setLoading]     = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      const [p, s, cards] = await Promise.all([
+        getVendorProfile(),
+        getVendorProfileStatus(),
+        getMyCards(),
+      ]);
+      setProfile(p);
+      setVstatus(s);
+      setActiveCards(cards.filter(c => c.isActive).length);
+    } catch {
+      // profile degrades gracefully — logout still works
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: () => {
-            // clearAll() from secureStorage, then navigate
-            router.replace('/(auth)/welcome');
-          },
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: async () => {
+          await clearAll();
+          router.replace('/(auth)/welcome');
         },
-      ],
-    );
+      },
+    ]);
   };
 
-  // ─── Section: ACCOUNT ───────────────────────────────────────────
-  const accountRows: ProfileRow[] = [
+  const shopName = profile?.shopName ?? '';
+  const initials = shopName.split(' ').slice(0, 2).map(w => w.charAt(0)).join('').toUpperCase() || 'V';
+  const sc = statusStyle(vstatus?.status ?? '');
+
+  const businessRows: NavRowDef[] = [
     {
-      id: 'profile',
-      icon: 'person-outline',
-      iconBg: '#E3F2FD',
-      iconColor: '#1565C0',
+      id: 'cards',
+      icon: 'card-outline',
+      label: 'My Cards',
+      subtitle: 'Create and manage loyalty cards',
+      onPress: () => router.push('/(main)/cards'),
+    },
+    {
+      id: 'subscriptions',
+      icon: 'people-outline',
+      label: 'Store Subscriptions',
+      subtitle: 'View all active customer subscriptions',
+      onPress: () => router.push('/(main)/store-subscriptions'),
+    },
+    {
+      id: 'redemption-history',
+      icon: 'receipt-outline',
+      label: 'Redemption History',
+      subtitle: 'View all processed redemptions',
+      onPress: () => router.push('/(main)/redemption-history'),
+    },
+  ];
+
+  const accountRows: NavRowDef[] = [
+    {
+      id: 'my-profile',
+      icon: 'person-circle-outline',
       label: 'My Profile',
-      subtitle: 'Edit your vendor info',
+      subtitle: 'Edit name, email, and business info',
       onPress: () => router.push('/(main)/my-profile'),
     },
     {
-      id: 'customer-history',
-      icon: 'people-outline',
-      iconBg: '#F3E5F5',
-      iconColor: '#6A1B9A',
-      label: 'Customer History',
-      subtitle: 'View customer card & transactions',
-     onPress: () => router.push('/(main)/customer_history'),
-
+      id: 'store-settings',
+      icon: 'storefront-outline',
+      label: 'Store Settings',
+      subtitle: 'Hours, holidays, and location',
+      onPress: () => {},
+      disabled: true,
     },
   ];
 
-  // ─── Section: PREFERENCES ───────────────────────────────────────
-  const preferenceRows: ProfileRow[] = [
-    {
-      id: 'settings',
-      icon: 'settings-outline',
-      iconBg: '#E8F5E9',
-      iconColor: '#2E7D32',
-      label: 'Settings',
-      subtitle: 'Notifications, language',
-      onPress: () => router.push('/(main)/settings'),
-    },
-  ];
-
-  // ─── Section: SUPPORT ───────────────────────────────────────────
-  const supportRows: ProfileRow[] = [
+  const supportRows: NavRowDef[] = [
     {
       id: 'help',
       icon: 'help-circle-outline',
-      iconBg: '#FFF8E1',
-      iconColor: '#F57F17',
-      label: 'Help',
-      subtitle: 'FAQs and support',
+      label: 'Help & Support',
+      subtitle: 'FAQs and contact us',
       onPress: () => {},
     },
     {
       id: 'terms',
       icon: 'document-text-outline',
-      iconBg: '#FCE4EC',
-      iconColor: '#880E4F',
-      label: 'Terms and Conditions',
-      subtitle: 'Read our terms',
+      label: 'Terms & Conditions',
       onPress: () => {},
     },
   ];
 
-  const renderRow = (row: ProfileRow) => (
-    <TouchableOpacity
-      key={row.id}
-      style={styles.row}
-      onPress={row.onPress}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.rowIconWrap, { backgroundColor: row.iconBg }]}>
-        <Ionicons name={row.icon} size={20} color={row.iconColor} />
-      </View>
-      <View style={styles.rowTextWrap}>
-        <Text style={styles.rowLabel}>{row.label}</Text>
-        {row.subtitle && <Text style={styles.rowSubtitle}>{row.subtitle}</Text>}
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-    </TouchableOpacity>
-  );
-
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.bgWarm} />
+      <StatusBar barStyle="dark-content" backgroundColor={DS.bg} />
 
-      {/* ── Header ── */}
-      <SafeAreaView style={styles.header}>
-        {/* Wavy decoration circles */}
-        <View style={styles.decorCircle1} />
-        <View style={styles.decorCircle2} />
-
-        {/* Store avatar */}
-        <View style={styles.storeAvatarWrap}>
-          <View style={styles.storeAvatar}>
-            <Ionicons name="storefront-outline" size={32} color="#1565C0" />
-          </View>
-        </View>
-        <Text style={styles.vendorName}>Sri Raghava Curry Point</Text>
-      </SafeAreaView>
-
-      {/* ── Scrollable content ── */}
       <ScrollView
-        style={styles.sheet}
-        contentContainerStyle={styles.scrollContent}
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Handle */}
-        <View style={styles.sheetHandle} />
-
-        {/* ── ACCOUNT ── */}
-        <Text style={styles.sectionTitle}>ACCOUNT</Text>
-        <View style={styles.card}>
-          {accountRows.map((row, idx) => (
-            <View key={row.id}>
-              {renderRow(row)}
-              {idx < accountRows.length - 1 && <View style={styles.rowDivider} />}
-            </View>
-          ))}
+        {/* Avatar / hero section */}
+        <View style={[styles.heroZone, { paddingTop: insets.top + 24 }]}>
+          {loading ? (
+            <ActivityIndicator color={DS.primary} style={{ paddingVertical: 48 }} />
+          ) : (
+            <>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{initials}</Text>
+              </View>
+              <Text style={styles.shopName} numberOfLines={1}>
+                {shopName || 'My Store'}
+              </Text>
+              {!!profile?.ownerName && (
+                <Text style={styles.ownerName} numberOfLines={1}>{profile.ownerName}</Text>
+              )}
+              {!!vstatus && (
+                <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
+                  <View style={[styles.statusDot, { backgroundColor: sc.fg }]} />
+                  <Text style={[styles.statusBadgeText, { color: sc.fg }]}>
+                    {vstatus.status}
+                  </Text>
+                </View>
+              )}
+            </>
+          )}
         </View>
 
-        {/* ── PREFERENCES ── */}
-        <Text style={styles.sectionTitle}>PREFERENCES</Text>
-        <View style={styles.card}>
-          {preferenceRows.map((row, idx) => (
-            <View key={row.id}>
-              {renderRow(row)}
-              {idx < preferenceRows.length - 1 && <View style={styles.rowDivider} />}
+        {/* Stats strip */}
+        {!loading && !!vstatus && (
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>{vstatus.commissionRate}%</Text>
+              <Text style={styles.statLabel}>COMMISSION RATE</Text>
             </View>
-          ))}
-        </View>
-
-        {/* ── SUPPORT ── */}
-        <Text style={styles.sectionTitle}>SUPPORT</Text>
-        <View style={styles.card}>
-          {supportRows.map((row, idx) => (
-            <View key={row.id}>
-              {renderRow(row)}
-              {idx < supportRows.length - 1 && <View style={styles.rowDivider} />}
+            <View style={styles.statDivider} />
+            <View style={styles.statCard}>
+              <Text style={[styles.statValue, { color: DS.success }]}>
+                {activeCards ?? '—'}
+              </Text>
+              <Text style={styles.statLabel}>ACTIVE CARDS</Text>
             </View>
-          ))}
+          </View>
+        )}
+
+        {/* Nav sections */}
+        <View style={styles.sectionsWrap}>
+          <Section title="BUSINESS"  rows={businessRows} />
+          <Section title="ACCOUNT"   rows={accountRows}  />
+          <Section title="SUPPORT"   rows={supportRows}  />
+
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+            <Ionicons name="log-out-outline" size={18} color={DS.primary} />
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
         </View>
-
-        {/* ── Logout ── */}
-        <TouchableOpacity
-          style={styles.logoutBtn}
-          onPress={handleLogout}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="log-out-outline" size={20} color={Colors.primary} />
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
-
-        <View style={{ height: 32 }} />
       </ScrollView>
     </View>
   );
 }
 
-// ─── Styles ─────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.bgWarm },
+  root:   { flex: 1, backgroundColor: DS.bg },
+  scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: 0 },
 
-  // ── Header ──
-  header: {
-    backgroundColor: Colors.bgWarm,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 28,
+  // Hero
+  heroZone: {
     alignItems: 'center',
-    overflow: 'hidden',
+    paddingBottom: 24,
+    paddingHorizontal: 20,
   },
-  decorCircle1: {
-    position: 'absolute', width: 180, height: 180,
-    borderRadius: 90, backgroundColor: Colors.circleLight,
-    top: -60, right: -40, opacity: 0.5,
-  },
-  decorCircle2: {
-    position: 'absolute', width: 120, height: 120,
-    borderRadius: 60, backgroundColor: Colors.circleMid,
-    top: -20, right: 60, opacity: 0.3,
-  },
-  storeAvatarWrap: { marginBottom: 12 },
-  storeAvatar: {
-    width: 72, height: 72, borderRadius: 36,
-    backgroundColor: '#E3F2FD',
+  avatar: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: DS.primary,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 3, borderColor: '#fff',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1, shadowRadius: 6, elevation: 4,
+    marginBottom: 14,
+    shadowColor: DS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25, shadowRadius: 10, elevation: 6,
   },
-  vendorName: {
-    fontSize: 18, fontWeight: '800', color: Colors.textDark,
-    textAlign: 'center',
+  avatarText:  { fontSize: 30, fontWeight: '900', color: '#fff' },
+  shopName:    { fontSize: 22, fontWeight: '800', color: DS.text, textAlign: 'center' },
+  ownerName:   { fontSize: 14, color: DS.text2, marginTop: 4, textAlign: 'center' },
+  statusBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6,
+    marginTop: 12,
   },
+  statusDot:       { width: 6, height: 6, borderRadius: 3 },
+  statusBadgeText: { fontSize: 12, fontWeight: '700' },
 
-  // ── Sheet ──
-  sheet: {
-    flex: 1,
-    backgroundColor: '#F2F2F2',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-  },
-  scrollContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 20 },
-  sheetHandle: {
-    width: 40, height: 4, backgroundColor: '#E0E0E0',
-    borderRadius: 2, alignSelf: 'center', marginBottom: 20,
-  },
-
-  // ── Section ──
-  sectionTitle: {
-    fontSize: 11, fontWeight: '700', color: Colors.textMuted,
-    letterSpacing: 1.2, marginBottom: 8, marginLeft: 4,
-  },
-  card: {
-    backgroundColor: '#fff', borderRadius: 20,
-    marginBottom: 20,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
-    overflow: 'hidden',
-  },
-
-  // ── Row ──
-  row: {
+  // Stats
+  statsRow: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 14, gap: 14,
+    backgroundColor: DS.surface, marginHorizontal: 16,
+    borderRadius: 16, borderWidth: 1, borderColor: DS.border,
+    marginBottom: 24, overflow: 'hidden',
   },
-  rowIconWrap: {
-    width: 40, height: 40, borderRadius: 12,
-    alignItems: 'center', justifyContent: 'center',
+  statCard: {
+    flex: 1, alignItems: 'center', paddingVertical: 16,
   },
-  rowTextWrap:  { flex: 1 },
-  rowLabel:     { fontSize: 15, fontWeight: '700', color: Colors.textDark },
-  rowSubtitle:  { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
-  rowDivider:   { height: 1, backgroundColor: '#F5F5F5', marginLeft: 70 },
+  statValue:   { fontSize: 24, fontWeight: '800', color: DS.primary, marginBottom: 3 },
+  statLabel:   { fontSize: 10, fontWeight: '700', color: DS.text3, letterSpacing: 0.5 },
+  statDivider: { width: 1, height: 44, backgroundColor: DS.border },
 
-  // ── Logout ──
+  // Sections
+  sectionsWrap:  { paddingHorizontal: 16 },
+  section:       { marginBottom: 20 },
+  sectionLabel: {
+    fontSize: 11, fontWeight: '700', color: DS.text3,
+    letterSpacing: 1.2, marginBottom: 8, marginLeft: 4,
+    textTransform: 'uppercase',
+  },
+  sectionCard: {
+    backgroundColor: DS.surface, borderRadius: 16,
+    borderWidth: 1, borderColor: DS.border, overflow: 'hidden',
+  },
+
+  // Nav row
+  navRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 14, gap: 12,
+  },
+  navRowDisabled: { opacity: 0.45 },
+  navRowIcon: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: DS.bg,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  navRowBody:  { flex: 1 },
+  navRowLabel: { fontSize: 15, fontWeight: '600', color: DS.text },
+  navRowSub:   { fontSize: 12, color: DS.text3, marginTop: 2 },
+  rowDivider:  { height: 1, backgroundColor: DS.border, marginLeft: 64 },
+
+  // Logout
   logoutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, backgroundColor: Colors.bgWarm,
-    borderRadius: 20, paddingVertical: 16,
-    borderWidth: 1, borderColor: '#F2CCBB',
+    gap: 8, backgroundColor: DS.surface,
+    borderRadius: 16, paddingVertical: 16,
+    borderWidth: 1.5, borderColor: '#F2CCBB',
   },
-  logoutText: { fontSize: 15, fontWeight: '700', color: Colors.primary },
+  logoutText: { fontSize: 15, fontWeight: '700', color: DS.primary },
 });

@@ -1,426 +1,337 @@
-// src/app/(auth)/signup.tsx
-
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  ActivityIndicator,
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  KeyboardAvoidingView, Platform, StatusBar,
+  ScrollView, ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import Colors from '../../core/constants/colors';
-import { useSignup } from '../../modules/auth/hooks/useAuth';
+import { useRegister } from '../../modules/auth/hooks/useAuth';
 
-const { height } = Dimensions.get('window');
+const DS = {
+  bg:          '#F6F7FA',
+  surface:     '#FFFFFF',
+  border:      '#EAECEF',
+  primary:     '#CC2200',
+  primaryDark: '#991A00',
+  primarySoft: '#FFF0EE',
+  accent:      '#C17B2F',
+  accentSoft:  '#FEF6EC',
+  success:     '#16A34A',
+  successSoft: '#F0FDF4',
+  warning:     '#D97706',
+  warningSoft: '#FFFBEB',
+  error:       '#DC2626',
+  errorSoft:   '#FFF1F1',
+  text:        '#1A1A1A',
+  text2:       '#5A6272',
+  text3:       '#9BA3AF',
+};
 
 export default function SignupScreen() {
-  const { phoneNumber } = useLocalSearchParams<{ phoneNumber: string }>();
-  const { handleSignup, loading, error } = useSignup();
+  const insets = useSafeAreaInsets();
+  const { phoneNumber: paramPhone } = useLocalSearchParams<{ phoneNumber: string }>();
+  const { handleRegister, loading, error } = useRegister();
 
-  const [hotelName, setHotelName] = useState('');
-  const [address, setAddress] = useState('');
-  const [email, setEmail] = useState('');
-  const [latitude, setLatitude] = useState('');
-  const [longitude, setLongitude] = useState('');
-  const [locationLoading, setLocationLoading] = useState(false);
-  const [locationError, setLocationError] = useState<string | null>(null);
+  const [hotelName, setHotelName]       = useState('');
+  const [address, setAddress]           = useState('');
+  const [email, setEmail]               = useState('');
+  const [mobileNumber, setMobileNumber] = useState(paramPhone ?? '');
+  const [latitude, setLatitude]         = useState('');
+  const [longitude, setLongitude]       = useState('');
+  const [locLoading, setLocLoading]     = useState(false);
+  const [locError, setLocError]         = useState<string | null>(null);
 
-  const isFormValid =
-    hotelName.trim() &&
-    address.trim() &&
-    email.trim() &&
-    latitude.trim() &&
-    longitude.trim();
+  const coordsSet    = latitude.trim().length > 0 && longitude.trim().length > 0;
+  const isFormValid  = !!(hotelName.trim() && address.trim() && email.trim() && mobileNumber.trim() && coordsSet);
 
-  // ── Auto detect location ───────────────────────
   const handleDetectLocation = async () => {
     try {
-      setLocationLoading(true);
-      setLocationError(null);
-
+      setLocLoading(true);
+      setLocError(null);
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setLocationError('Location permission denied. Enter manually.');
+        setLocError('Location permission denied. Enter coordinates manually.');
         return;
       }
-
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       setLatitude(loc.coords.latitude.toFixed(6));
       setLongitude(loc.coords.longitude.toFixed(6));
-    } catch (err) {
-      setLocationError('Could not fetch location. Enter manually.');
+    } catch {
+      setLocError('Could not detect location. Please enter manually.');
     } finally {
-      setLocationLoading(false);
+      setLocLoading(false);
     }
   };
 
-  // ── Submit ─────────────────────────────────────
   const onSignup = () => {
     if (!isFormValid) return;
-    handleSignup({
-      hotelName: hotelName.trim(),
-      address: address.trim(),
-      mobileNumber: phoneNumber,
-      email: email.trim(),
-      latitude: parseFloat(latitude),
-      longitude: parseFloat(longitude),
+    handleRegister({
+      hotelName:    hotelName.trim(),
+      address:      address.trim(),
+      mobileNumber: mobileNumber.trim(),
+      email:        email.trim(),
+      latitude:     parseFloat(latitude),
+      longitude:    parseFloat(longitude),
     });
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <StatusBar barStyle="light-content" backgroundColor={DS.primary} />
 
-      {/* ── Decorative circles ── */}
-      <View style={styles.circleLarge} />
-      <View style={styles.circleSmall} />
+      {/* Brand Zone */}
+      <View style={styles.brandZone}>
+     <View style={[styles.brandContent, { paddingTop: insets.top + 24 }]}>
+      <View style={styles.logoMark}>
+     <Text style={styles.logoMarkText}>S</Text>
+     </View>
 
-      {/* ── Logo ── */}
-      <View style={styles.logoContainer}>
-        <Text style={styles.logoText}>Strike</Text>
-      </View>
+    <Text style={styles.wordmark}>STRIKE</Text>
+    <Text style={styles.tagline}>Register your business</Text>
+  </View>
+</View>
 
-      <View style={styles.illustrationPlaceholder} />
-
-      {/* ── White card ── */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.cardWrapper}
+      {/* Form Zone */}
+      <ScrollView
+        style={styles.formZone}
+        contentContainerStyle={styles.formContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          contentContainerStyle={styles.card}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+        <Text style={styles.formTitle}>Create your account</Text>
+        <Text style={styles.formSubtitle}>Set up your store on Strike</Text>
+
+        {/* ── BUSINESS INFO ── */}
+        <Text style={styles.sectionLabel}>BUSINESS INFO</Text>
+
+        <Text style={styles.inputLabel}>Business Name *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="e.g. Spice Garden"
+          placeholderTextColor={DS.text3}
+          value={hotelName}
+          onChangeText={setHotelName}
+          autoCapitalize="words"
+        />
+
+        <Text style={styles.inputLabel}>Address *</Text>
+        <TextInput
+          style={[styles.input, styles.inputMultiline]}
+          placeholder="e.g. 123 Main Street, Hyderabad"
+          placeholderTextColor={DS.text3}
+          value={address}
+          onChangeText={setAddress}
+          multiline
+          numberOfLines={3}
+          textAlignVertical="top"
+        />
+
+        {/* ── CONTACT ── */}
+        <Text style={styles.sectionLabel}>CONTACT</Text>
+
+        <Text style={styles.inputLabel}>Email</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="store@example.com"
+          placeholderTextColor={DS.text3}
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+
+        <Text style={styles.inputLabel}>Mobile Number *</Text>
+        <View style={styles.phoneRow}>
+          <View style={styles.countryChip}>
+            <Text style={styles.countryText}>+91</Text>
+          </View>
+          <View style={styles.phoneDivider} />
+          <TextInput
+            style={styles.phoneInput}
+            placeholder="98765 43210"
+            placeholderTextColor={DS.text3}
+            value={mobileNumber}
+            onChangeText={setMobileNumber}
+            keyboardType="phone-pad"
+            maxLength={10}
+            editable={!paramPhone}
+          />
+        </View>
+
+        {/* ── LOCATION ── */}
+        <Text style={styles.sectionLabel}>LOCATION</Text>
+
+        <TouchableOpacity
+          style={styles.detectBtn}
+          onPress={handleDetectLocation}
+          disabled={locLoading}
+          activeOpacity={0.85}
         >
-          {/* Heading */}
-          <Text style={styles.heading}>Vendor Signup</Text>
-          <Text style={styles.subheading}>
-            Register your hotel on Strike 🍱
-          </Text>
-
-          {/* Hotel Name */}
-          <Text style={styles.label}>Hotel Name</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. Spice Garden"
-            placeholderTextColor={Colors.textPlaceholder}
-            value={hotelName}
-            onChangeText={setHotelName}
-            autoCapitalize="words"
-          />
-
-          {/* Address */}
-          <Text style={styles.label}>Address</Text>
-          <TextInput
-            style={[styles.input, styles.inputMultiline]}
-            placeholder="e.g. 123 Main Street, Hyderabad"
-            placeholderTextColor={Colors.textPlaceholder}
-            value={address}
-            onChangeText={setAddress}
-            multiline
-            numberOfLines={3}
-          />
-
-          {/* Email */}
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. hotel@example.com"
-            placeholderTextColor={Colors.textPlaceholder}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-
-          {/* Mobile (read only) */}
-          <Text style={styles.label}>Mobile Number</Text>
-          <View style={styles.inputReadOnly}>
-            <Text style={styles.inputReadOnlyText}>
-              {phoneNumber || '—'}
-            </Text>
-            <Text style={styles.verifiedBadge}>✓ Verified</Text>
-          </View>
-
-          {/* Location heading */}
-          <Text style={styles.label}>Location</Text>
-
-          {/* Auto detect button */}
-          <TouchableOpacity
-            style={styles.detectButton}
-            onPress={handleDetectLocation}
-            disabled={locationLoading}
-            activeOpacity={0.85}
-          >
-            {locationLoading ? (
-              <ActivityIndicator color={Colors.primary} size="small" />
-            ) : (
-              <Text style={styles.detectIcon}>📍</Text>
-            )}
-            <Text style={styles.detectText}>
-              {locationLoading
-                ? 'Detecting...'
-                : latitude
-                ? 'Re-detect Location'
-                : 'Auto Detect Location'}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Location error */}
-          {locationError && (
-            <Text style={styles.errorText}>{locationError}</Text>
+          {locLoading ? (
+            <ActivityIndicator size="small" color={DS.primary} />
+          ) : (
+            <Ionicons name="location-outline" size={18} color={DS.primary} />
           )}
-
-          {/* Lat / Long inputs */}
-          <View style={styles.coordRow}>
-            <View style={styles.coordField}>
-              <Text style={styles.coordLabel}>Latitude</Text>
-              <TextInput
-                style={styles.coordInput}
-                placeholder="e.g. 17.3850"
-                placeholderTextColor={Colors.textPlaceholder}
-                value={latitude}
-                onChangeText={setLatitude}
-                keyboardType="decimal-pad"
-              />
-            </View>
-            <View style={styles.coordField}>
-              <Text style={styles.coordLabel}>Longitude</Text>
-              <TextInput
-                style={styles.coordInput}
-                placeholder="e.g. 78.4867"
-                placeholderTextColor={Colors.textPlaceholder}
-                value={longitude}
-                onChangeText={setLongitude}
-                keyboardType="decimal-pad"
-              />
-            </View>
-          </View>
-
-          {/* Form error */}
-          {error && <Text style={styles.errorText}>{error}</Text>}
-
-          {/* Submit button */}
-          <TouchableOpacity
-            style={[
-              styles.signupButton,
-              (!isFormValid || loading) && styles.signupButtonDisabled,
-            ]}
-            onPress={onSignup}
-            disabled={!isFormValid || loading}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.signupButtonText}>
-              {loading ? 'Registering...' : 'Register Hotel'}
-            </Text>
-            {!loading && <Text style={styles.signupArrow}>→</Text>}
-          </TouchableOpacity>
-
-          {/* Terms */}
-          <Text style={styles.termsText}>
-            By signing up you agree to our{' '}
-            <Text style={styles.termsLink}>Terms & Conditions</Text>
-            {' '}and{' '}
-            <Text style={styles.termsLink}>Privacy Policy</Text>
+          <Text style={styles.detectBtnText}>
+            {locLoading ? 'Detecting…' : coordsSet ? 'Re-detect Location' : 'Auto Detect Location'}
           </Text>
+        </TouchableOpacity>
 
-        </ScrollView>
-      </KeyboardAvoidingView>
+        {coordsSet && !locError && (
+          <View style={styles.locationSuccess}>
+            <Ionicons name="checkmark-circle" size={14} color={DS.success} />
+            <Text style={styles.locationSuccessText}>{latitude}, {longitude}</Text>
+          </View>
+        )}
 
-    </View>
+        {!!locError && (
+          <View style={styles.errorRow}>
+            <Ionicons name="alert-circle-outline" size={14} color={DS.primary} />
+            <Text style={styles.errorText}>{locError}</Text>
+          </View>
+        )}
+
+        <Text style={styles.manualLabel}>Or enter coordinates manually:</Text>
+        <View style={styles.coordRow}>
+          <View style={styles.coordField}>
+            <Text style={styles.inputLabel}>Latitude</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="17.3850"
+              placeholderTextColor={DS.text3}
+              value={latitude}
+              onChangeText={setLatitude}
+              keyboardType="decimal-pad"
+            />
+          </View>
+          <View style={styles.coordField}>
+            <Text style={styles.inputLabel}>Longitude</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="78.4867"
+              placeholderTextColor={DS.text3}
+              value={longitude}
+              onChangeText={setLongitude}
+              keyboardType="decimal-pad"
+            />
+          </View>
+        </View>
+
+        {!!error && (
+          <View style={styles.errorRow}>
+            <Ionicons name="alert-circle-outline" size={14} color={DS.primary} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
+        <TouchableOpacity
+          style={[styles.primaryBtn, (!isFormValid || loading) && styles.primaryBtnDisabled]}
+          onPress={onSignup}
+          disabled={!isFormValid || loading}
+          activeOpacity={0.85}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="storefront-outline" size={18} color="#fff" />
+              <Text style={styles.primaryBtnText}>Register Store</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        <Text style={styles.termsText}>
+          By signing up you agree to our{' '}
+          <Text style={styles.termsLink}>Terms & Conditions</Text>
+          {' and '}
+          <Text style={styles.termsLink}>Privacy Policy</Text>
+        </Text>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.bgWarm,
+  root: { flex: 1, backgroundColor: DS.primary },
+
+  // Brand Zone
+  brandZone:    { backgroundColor: DS.primary, paddingBottom: 20 },
+  brandContent: { alignItems: 'center', paddingBottom: 4 },
+  logoMark: {
+    width: 48, height: 48, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 10,
   },
-  circleLarge: {
-    position: 'absolute',
-    top: -60,
-    left: -60,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: Colors.circleMid,
-    opacity: 0.5,
+  logoMarkText: { fontSize: 24, fontWeight: '900', color: '#fff' },
+  wordmark:     { fontSize: 22, fontWeight: '900', color: '#fff', letterSpacing: 5, marginBottom: 6 },
+  tagline:      { fontSize: 13, color: 'rgba(255,255,255,0.7)' },
+
+  // Form Zone
+  formZone:    { flex: 1, backgroundColor: DS.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28 },
+  formContent: { paddingHorizontal: 24, paddingTop: 28, paddingBottom: 48 },
+  formTitle:    { fontSize: 20, fontWeight: '800', color: DS.text, marginBottom: 4 },
+  formSubtitle: { fontSize: 14, color: DS.text2, marginBottom: 24 },
+
+  // Section
+  sectionLabel: {
+    fontSize: 11, fontWeight: '700', color: DS.text3,
+    letterSpacing: 1, marginBottom: 14, marginTop: 8,
+    textTransform: 'uppercase',
   },
-  circleSmall: {
-    position: 'absolute',
-    top: 30,
-    left: 60,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: Colors.circleLight,
-    opacity: 0.6,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginTop: 60,
-  },
-  logoText: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: Colors.accent,
-  },
-  illustrationPlaceholder: {
-    height: height * 0.08,
-  },
-  cardWrapper: {
-    flex: 1,
-  },
-  card: {
-    backgroundColor: Colors.bgCard,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    paddingHorizontal: 28,
-    paddingTop: 36,
-    paddingBottom: 48,
-    flexGrow: 1,
-  },
-  heading: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: Colors.textDark,
-    marginBottom: 6,
-  },
-  subheading: {
-    fontSize: 14,
-    color: Colors.textMuted,
-    marginBottom: 28,
-  },
-  label: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.textDark,
-    marginBottom: 10,
-  },
+
+  // Input
+  inputLabel: { fontSize: 12, fontWeight: '600', color: DS.text2, marginBottom: 7 },
   input: {
-    backgroundColor: Colors.bgInput,
-    borderRadius: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    fontSize: 16,
-    color: Colors.textDark,
-    marginBottom: 20,
+    backgroundColor: DS.bg, borderWidth: 1.5, borderColor: DS.border,
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13,
+    fontSize: 15, color: DS.text, marginBottom: 16,
   },
-  inputMultiline: {
-    height: 90,
-    textAlignVertical: 'top',
-  },
-  inputReadOnly: {
-    backgroundColor: Colors.bgInput,
-    borderRadius: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    marginBottom: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  inputReadOnlyText: {
-    fontSize: 16,
-    color: Colors.textMuted,
-  },
-  verifiedBadge: {
-    fontSize: 13,
-    color: '#2E7D32',
-    fontWeight: '600',
-  },
+  inputMultiline: { height: 84, paddingTop: 12, textAlignVertical: 'top' },
 
-  // ── Location ──
-  detectButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: Colors.borderPrimary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    marginBottom: 14,
-    gap: 10,
+  // Phone
+  phoneRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: DS.bg, borderWidth: 1.5, borderColor: DS.border,
+    borderRadius: 12, marginBottom: 16, overflow: 'hidden', height: 52,
   },
-  detectIcon: {
-    fontSize: 18,
-  },
-  detectText: {
-    fontSize: 15,
-    color: Colors.primary,
-    fontWeight: '600',
-  },
-  coordRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  coordField: {
-    flex: 1,
-  },
-  coordLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textMuted,
-    marginBottom: 8,
-  },
-  coordInput: {
-    backgroundColor: Colors.bgInput,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    fontSize: 15,
-    color: Colors.textDark,
-  },
+  countryChip:  { paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
+  countryText:  { fontSize: 15, fontWeight: '600', color: DS.text2 },
+  phoneDivider: { width: 1, height: 28, backgroundColor: DS.border },
+  phoneInput:   { flex: 1, paddingHorizontal: 14, fontSize: 15, color: DS.text, height: '100%' },
 
-  // ── Error ──
-  errorText: {
-    color: Colors.primary,
-    fontSize: 13,
-    marginBottom: 12,
+  // Location
+  detectBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderWidth: 1.5, borderColor: DS.primary, borderRadius: 12,
+    paddingVertical: 13, paddingHorizontal: 16, marginBottom: 10,
   },
+  detectBtnText:       { fontSize: 15, fontWeight: '600', color: DS.primary },
+  locationSuccess:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  locationSuccessText: { fontSize: 13, color: DS.success, fontWeight: '500' },
+  manualLabel:         { fontSize: 12, color: DS.text3, marginBottom: 10 },
+  coordRow:            { flexDirection: 'row', gap: 12 },
+  coordField:          { flex: 1 },
 
-  // ── Submit ──
-  signupButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: 50,
-    paddingVertical: 18,
-    paddingHorizontal: 28,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
+  // Error
+  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  errorText: { fontSize: 13, color: DS.primary, flex: 1 },
+
+  // Buttons
+  primaryBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, backgroundColor: DS.primary, borderRadius: 14, height: 52,
+    marginTop: 8, marginBottom: 16,
   },
-  signupButtonDisabled: {
-    opacity: 0.5,
-  },
-  signupButtonText: {
-    color: Colors.white,
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  signupArrow: {
-    color: Colors.white,
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  termsText: {
-    textAlign: 'center',
-    color: Colors.textMuted,
-    fontSize: 12,
-    lineHeight: 20,
-  },
-  termsLink: {
-    color: Colors.primary,
-    fontWeight: '600',
-  },
+  primaryBtnDisabled: { opacity: 0.4 },
+  primaryBtnText:     { fontSize: 16, fontWeight: '700', color: '#fff' },
+
+  termsText: { fontSize: 12, color: DS.text3, textAlign: 'center', lineHeight: 18 },
+  termsLink:  { color: DS.primary, fontWeight: '600' },
 });

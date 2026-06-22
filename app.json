@@ -8,30 +8,35 @@
       "ios",
       "android"
     ],
-    "router": {
-      "root": "src/app"
-    },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FEF0E6"
       },
-      "package": "com.strike.frontend"
+      "package": "com.strike.frontend",
+      "usesCleartextTraffic": true,
+      "softwareKeyboardLayoutMode": "resize"
     },
     "ios": {
       "bundleIdentifier": "com.strike.frontend"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Strike needs your location to set your store on the map."
+        }
+      ],
+      "expo-secure-store",
+      "expo-status-bar"
     ],
-    "metro": {
-      "configPath": "metro.config.cjs"
-    },
     "extra": {
-      "router": {},
       "eas": {
         "projectId": "7364ce84-408c-47ae-823d-bff4da22b602"
       }
-    }
+    },
+    "owner": "nikhilvarma"
   }
 }
