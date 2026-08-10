@@ -18,7 +18,7 @@ interface RedemptionItemBackend {
   totalPrice: number;
 }
 
-interface RedemptionQueueResponse {
+interface RedemptionBackend {
   id: number;
   subscriptionId: number;
   userId: number;
@@ -29,39 +29,61 @@ interface RedemptionQueueResponse {
   initiatedBy: string;
   items: RedemptionItemBackend[];
   createdAt: string;
+  updatedAt?: string;
+  processedAt?: string;
 }
 
-// ─── Frontend UI types (shape matched by home.tsx) ──────────────────
+// ─── Frontend UI types ──────────────────────────────────────────────
 
 export interface RedemptionItem {
   id: string;
   name: string;
   qty: number;
+  unitPrice?: number;
   addOn?: string;
   addOnPrice?: number;
   category?: string;
 }
 
+// Statuses are exact backend values (lowercased). No invented statuses.
+export type RedemptionStatus =
+  | 'pending'
+  | 'completed'
+  | 'rejected'
+  | 'failed'
+  | 'reversed';
+
 export interface RedemptionRequest {
   id: string;
   cardId: string;
+  subscriptionId: number;
   customer: string;
   customerHandle: string;
   phone: string;
   cardType: string;
   timeAgo: string;
   orderedAt: string;
+  processedAt?: string;
+  // ISO-8601 strings kept for date comparisons (e.g. "confirmed today" filter)
+  createdAtRaw: string;
+  processedAtRaw?: string;
   items: RedemptionItem[];
   totalUnits: number;
   totalValue: number;
   addOnTotal: number;
-  status: 'pending' | 'accepted';
+  status: RedemptionStatus;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
 function formatTimeAgo(iso: string): string {
-  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  // Backend sends Java LocalDateTime without a timezone suffix.
+  // Do NOT append 'Z' — JavaScript parses a timezone-naive ISO string as local
+  // device time (IST on an Indian device), which matches the backend's clock.
+  // Appending 'Z' would misinterpret IST as UTC, placing the timestamp 5:30h ahead.
+  const date = new Date(iso);
+  const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diff < 0) return 'just now';
   if (diff < 60) return `${diff}s ago`;
   if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
@@ -74,39 +96,71 @@ function formatDate(iso: string): string {
   });
 }
 
-function mapToRedemptionRequest(r: RedemptionQueueResponse): RedemptionRequest {
-  const totalUnits = r.items.reduce((sum, item) => sum + item.quantity, 0);
-  const handle = '@' + r.customerName.toLowerCase().replace(/\s+/g, '_');
+function mapStatus(s: string): RedemptionStatus {
+  switch (s) {
+    case 'PENDING':   return 'pending';
+    case 'COMPLETED': return 'completed';
+    case 'REJECTED':  return 'rejected';
+    case 'FAILED':    return 'failed';
+    case 'REVERSED':  return 'reversed';
+    default:          return 'pending';
+  }
+}
+
+function mapToRedemptionRequest(r: RedemptionBackend): RedemptionRequest {
+  const safeItems = r.items ?? [];
+  const totalUnits = safeItems.reduce((sum, item) => sum + (item.quantity ?? 0), 0);
+  const handle = '@' + (r.customerName ?? '').toLowerCase().replace(/\s+/g, '_');
 
   return {
-    id: String(r.id),
-    cardId: '#' + r.subscriptionId,
-    customer: r.customerName,
-    customerHandle: handle,
-    phone: '',
-    cardType: 'Card',
-    timeAgo: formatTimeAgo(r.createdAt),
-    orderedAt: formatDate(r.createdAt),
-    items: r.items.map(item => ({
-      id: String(item.menuItemId),
-      name: item.menuItemName,
-      qty: item.quantity,
-      category: 'Items',
+    id:              String(r.id),
+    cardId:          '#' + r.subscriptionId,
+    subscriptionId:  r.subscriptionId,
+    customer:        r.customerName ?? '',
+    customerHandle:  handle,
+    phone:           '',
+    cardType:        'Card',
+    timeAgo:         formatTimeAgo(r.createdAt),
+    orderedAt:       formatDate(r.createdAt),
+    processedAt:     r.processedAt ? formatDate(r.processedAt) : undefined,
+    createdAtRaw:    r.createdAt,
+    processedAtRaw:  r.processedAt,
+    items:           safeItems.map(item => ({
+      id:        String(item.menuItemId),
+      name:      item.menuItemName ?? '',
+      qty:       item.quantity ?? 0,
+      unitPrice: item.unitPrice,
+      category:  'Items',
     })),
     totalUnits,
-    totalValue: Number(r.totalAmount),
-    addOnTotal: 0,
-    status: r.status === 'PENDING' ? 'pending' : 'accepted',
+    totalValue:  Number(r.totalAmount ?? 0),
+    addOnTotal:  0,
+    status:      mapStatus(r.status),
   };
 }
 
 // ─── Service functions ───────────────────────────────────────────────
 
 export async function fetchRedemptionQueue(storeId: number): Promise<RedemptionRequest[]> {
-  const res = await axiosInstance.get<ApiResponse<RedemptionQueueResponse[]>>(
+  const res = await axiosInstance.get<ApiResponse<RedemptionBackend[]>>(
     endpoints.redemption.queue(storeId),
   );
   return (res.data.data ?? []).map(mapToRedemptionRequest);
+}
+
+export async function fetchRedemptionHistory(storeId: number): Promise<RedemptionRequest[]> {
+  const res = await axiosInstance.get<ApiResponse<{ content: RedemptionBackend[] }>>(
+    endpoints.redemption.history(storeId),
+  );
+  const content = res.data.data?.content ?? [];
+  return content.map(mapToRedemptionRequest);
+}
+
+export async function fetchRedemptionById(id: string): Promise<RedemptionRequest> {
+  const res = await axiosInstance.get<ApiResponse<RedemptionBackend>>(
+    endpoints.redemption.detail(id),
+  );
+  return mapToRedemptionRequest(res.data.data);
 }
 
 export async function confirmRedemption(id: string): Promise<void> {
@@ -115,11 +169,4 @@ export async function confirmRedemption(id: string): Promise<void> {
 
 export async function rejectRedemption(id: string, reason?: string): Promise<void> {
   await axiosInstance.post(endpoints.redemption.reject(id), reason ? { reason } : undefined);
-}
-
-export async function fetchRedemptionHistory(storeId: number): Promise<RedemptionRequest[]> {
-  const res = await axiosInstance.get<ApiResponse<RedemptionQueueResponse[]>>(
-    endpoints.redemption.history(storeId),
-  );
-  return (res.data.data ?? []).map(mapToRedemptionRequest);
 }

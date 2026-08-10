@@ -2,8 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   StatusBar, ScrollView, Alert, ActivityIndicator,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, Modal,
 } from 'react-native';
+import Animated, {
+  useSharedValue, useAnimatedStyle, withTiming, withDelay, withSpring, Easing,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -51,6 +54,121 @@ function Stepper({ current }: { current: Step }) {
   );
 }
 
+type SuccessDetails = {
+  name: string;
+  price: number;
+  wallet: number;
+  bonus: number;
+  days: number;
+  catCount: number;
+  itemCount: number;
+};
+
+function SuccessModal({
+  visible, details, onDone,
+}: { visible: boolean; details: SuccessDetails | null; onDone: () => void }) {
+  const ringScale   = useSharedValue(0.6);
+  const ringOpacity = useSharedValue(0);
+  const iconScale   = useSharedValue(0);
+  const sheetY      = useSharedValue(24);
+  const sheetOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (visible) {
+      ringScale.value   = 0.6;
+      ringOpacity.value = 0.55;
+      iconScale.value   = 0;
+      sheetY.value       = 24;
+      sheetOpacity.value = 0;
+
+      sheetOpacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) });
+      sheetY.value        = withTiming(0, { duration: 280, easing: Easing.out(Easing.cubic) });
+      iconScale.value    = withDelay(120, withSpring(1, { damping: 9, stiffness: 140 }));
+      ringScale.value    = withDelay(120, withTiming(1.9, { duration: 850, easing: Easing.out(Easing.cubic) }));
+      ringOpacity.value  = withDelay(120, withTiming(0, { duration: 850, easing: Easing.out(Easing.cubic) }));
+    }
+  }, [visible]);
+
+  const iconStyle  = useAnimatedStyle(() => ({ transform: [{ scale: iconScale.value }] }));
+  const ringStyle  = useAnimatedStyle(() => ({
+    opacity: ringOpacity.value,
+    transform: [{ scale: ringScale.value }],
+  }));
+  const sheetStyle = useAnimatedStyle(() => ({
+    opacity: sheetOpacity.value,
+    transform: [{ translateY: sheetY.value }],
+  }));
+
+  if (!details) return null;
+
+  const stats = [
+    { label: 'PRICE', value: `₹${details.price}` },
+    { label: 'WALLET', value: `₹${details.wallet}`, accent: true },
+    { label: 'VALIDITY', value: `${details.days}d` },
+  ];
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onDone} statusBarTranslucent>
+      <View style={ss.successOverlay}>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onDone} />
+        <Animated.View style={[ss.successSheet, sheetStyle]}>
+          <View style={ss.successBadgeWrap}>
+            <Animated.View style={[ss.successRing, ringStyle]} />
+            <Animated.View style={[ss.successIconCircle, iconStyle]}>
+              <Ionicons name="checkmark" size={34} color="#fff" />
+            </Animated.View>
+          </View>
+
+          <Text style={ss.successTitle}>Card Created!</Text>
+          <Text style={ss.successSubtitle}>
+            <Text style={ss.successCardName}>"{details.name}"</Text> is now live. Customers can
+            subscribe and start redeeming right away.
+          </Text>
+
+          <View style={ss.successStatsRow}>
+            {stats.map((s, idx) => (
+              <View key={s.label} style={ss.successStatBlock}>
+                <Text style={ss.successStatLabel}>{s.label}</Text>
+                <Text style={[ss.successStatValue, s.accent && { color: DS.primary }]}>{s.value}</Text>
+                {idx < stats.length - 1 && <View style={ss.successStatDivider} />}
+              </View>
+            ))}
+          </View>
+
+          {details.bonus > 0 && (
+            <View style={ss.successBonusPill}>
+              <Ionicons name="sparkles" size={13} color={DS.success} />
+              <Text style={ss.successBonusText}>
+                +₹{details.bonus.toFixed(0)} bonus value for customers
+              </Text>
+            </View>
+          )}
+
+          <View style={ss.successMetaRow}>
+            <View style={ss.successMetaChip}>
+              <Ionicons name="pricetags-outline" size={13} color={DS.text2} />
+              <Text style={ss.successMetaText}>
+                {details.catCount} categor{details.catCount === 1 ? 'y' : 'ies'}
+              </Text>
+            </View>
+            <View style={ss.successMetaChip}>
+              <Ionicons name="restaurant-outline" size={13} color={DS.text2} />
+              <Text style={ss.successMetaText}>
+                {details.itemCount} item{details.itemCount !== 1 ? 's' : ''}
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity style={ss.successDoneBtn} onPress={onDone} activeOpacity={0.88}>
+            <Ionicons name="checkmark-circle" size={18} color="#fff" />
+            <Text style={ss.successDoneText}>Done</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function CardCreateScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -80,6 +198,7 @@ export default function CardCreateScreen() {
   const [loadingData, setLoadingData] = useState(true);
   const [dataError, setDataError]     = useState<string | null>(null);
   const [submitting, setSubmitting]   = useState(false);
+  const [successDetails, setSuccessDetails] = useState<SuccessDetails | null>(null);
 
   // ── Derived ────────────────────────────────────────────────────────
   const price   = parseFloat(cardPrice) || 0;
@@ -197,11 +316,15 @@ export default function CardCreateScreen() {
     setSubmitting(true);
     try {
       const created = await createCard(payload);
-      Alert.alert(
-        'Card Created!',
-        `"${created.name}" is now live. Customers can subscribe and redeem.`,
-        [{ text: 'Done', onPress: () => router.back() }],
-      );
+      setSuccessDetails({
+        name: created.name,
+        price,
+        wallet,
+        bonus,
+        days,
+        catCount: selectedCatIds.length,
+        itemCount: selectedItemIds.length,
+      });
     } catch (err: any) {
       Alert.alert('Error', err?.message ?? 'Failed to create card.');
     } finally {
@@ -690,6 +813,12 @@ export default function CardCreateScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      <SuccessModal
+        visible={successDetails !== null}
+        details={successDetails}
+        onDone={() => router.back()}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -868,4 +997,69 @@ const ss = StyleSheet.create({
   },
   nextBtnOff:  { opacity: 0.4 },
   nextBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+
+  // Success modal
+  successOverlay: { flex: 1, backgroundColor: 'rgba(10,10,12,0.6)', justifyContent: 'flex-end' },
+  successSheet: {
+    backgroundColor: DS.surface,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingTop: 28, paddingHorizontal: 24, paddingBottom: 36,
+    alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.12, shadowRadius: 20, elevation: 20,
+  },
+  successBadgeWrap: {
+    width: 88, height: 88, alignItems: 'center', justifyContent: 'center', marginBottom: 18,
+  },
+  successRing: {
+    position: 'absolute', width: 76, height: 76, borderRadius: 38,
+    backgroundColor: DS.success,
+  },
+  successIconCircle: {
+    width: 68, height: 68, borderRadius: 34,
+    backgroundColor: DS.success, alignItems: 'center', justifyContent: 'center',
+    shadowColor: DS.success, shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35, shadowRadius: 12, elevation: 8,
+  },
+  successTitle: {
+    fontSize: 22, fontWeight: '800', color: DS.text, marginBottom: 8, textAlign: 'center',
+  },
+  successSubtitle: {
+    fontSize: 14, color: DS.text2, textAlign: 'center', lineHeight: 21, marginBottom: 22,
+    paddingHorizontal: 4,
+  },
+  successCardName: { color: DS.text, fontWeight: '700' },
+  successStatsRow: {
+    flexDirection: 'row', width: '100%',
+    backgroundColor: DS.bg, borderRadius: 16, borderWidth: 1, borderColor: DS.border,
+    paddingVertical: 14, marginBottom: 14,
+  },
+  successStatBlock: { flex: 1, alignItems: 'center' },
+  successStatLabel: {
+    fontSize: 9, fontWeight: '700', color: DS.text3, letterSpacing: 0.6, marginBottom: 4,
+  },
+  successStatValue: { fontSize: 15, fontWeight: '800', color: DS.text },
+  successStatDivider: {
+    position: 'absolute', right: 0, top: '15%', bottom: '15%', width: 1, backgroundColor: DS.border,
+  },
+  successBonusPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: DS.successSoft, borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 7, marginBottom: 14,
+  },
+  successBonusText: { fontSize: 12, fontWeight: '700', color: DS.success },
+  successMetaRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
+  successMetaChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
+    borderWidth: 1, borderColor: DS.border,
+  },
+  successMetaText: { fontSize: 12, fontWeight: '600', color: DS.text2 },
+  successDoneBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: DS.success, borderRadius: 14, paddingVertical: 15, width: '100%',
+    shadowColor: DS.success, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 8, elevation: 5,
+  },
+  successDoneText: { fontSize: 15, fontWeight: '800', color: '#fff' },
 });

@@ -6,11 +6,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getStoreSubscriptions } from '../../modules/cards/services/cardService';
-import type { SubscriptionResponse, SubscriptionStatus } from '../../modules/cards/types/card.types';
-import axiosInstance from '../../core/api/axiosInstance';
-import endpoints from '../../core/api/endpoints';
-import { getUserMessage } from '../../core/api/errorMessage';
+import { getMyCoupons } from '../../modules/coupon/services/couponService';
+import type { CouponResponse } from '../../modules/coupon/types/coupon.types';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -29,14 +26,22 @@ const DS = {
   text3:       '#9BA3AF',
 };
 
-type Filter = 'all' | SubscriptionStatus;
+type Filter = 'all' | 'active' | 'expired' | 'inactive';
 
-function statusStyle(s: SubscriptionStatus) {
-  if (s === 'ACTIVE')     return { bg: DS.successSoft, fg: DS.success };
-  if (s === 'EXPIRED')    return { bg: DS.warningSoft, fg: DS.warning };
-  if (s === 'EXHAUSTED')  return { bg: DS.primarySoft, fg: DS.primary };
-  if (s === 'CANCELLED')  return { bg: DS.errorSoft,   fg: DS.error   };
-  return { bg: DS.bg, fg: DS.text3 };
+function isExpired(coupon: CouponResponse) {
+  return new Date(coupon.validUntil).getTime() < Date.now();
+}
+
+function couponState(coupon: CouponResponse): 'active' | 'expired' | 'inactive' {
+  if (!coupon.isActive) return 'inactive';
+  if (isExpired(coupon)) return 'expired';
+  return 'active';
+}
+
+function stateStyle(state: 'active' | 'expired' | 'inactive') {
+  if (state === 'active')   return { bg: DS.successSoft, fg: DS.success, label: 'Active' };
+  if (state === 'expired')  return { bg: DS.warningSoft, fg: DS.warning, label: 'Expired' };
+  return { bg: DS.errorSoft, fg: DS.error, label: 'Inactive' };
 }
 
 function formatDate(iso: string) {
@@ -45,8 +50,12 @@ function formatDate(iso: string) {
   });
 }
 
-function formatCurrency(n: number) {
-  return '₹' + n.toLocaleString('en-IN');
+function formatDiscount(c: CouponResponse) {
+  if (c.discountType === 'PERCENTAGE') {
+    const cap = c.maxDiscountAmount != null ? ` (up to ₹${c.maxDiscountAmount})` : '';
+    return `${c.discountValue}% off${cap}`;
+  }
+  return `₹${c.discountValue} off`;
 }
 
 function SkeletonCard() {
@@ -68,42 +77,45 @@ function SkeletonCard() {
   );
 }
 
-function SubscriptionCard({ item }: { item: SubscriptionResponse }) {
-  const sc = statusStyle(item.status);
+function CouponCard({ item }: { item: CouponResponse }) {
+  const sc = stateStyle(couponState(item));
+  const usage = item.maxUses != null ? `${item.usedCount} / ${item.maxUses} used` : `${item.usedCount} used (unlimited)`;
+
   return (
     <View style={styles.card}>
       <View style={styles.cardTop}>
         <View style={styles.cardIcon}>
-          <Ionicons name="card-outline" size={20} color={DS.primary} />
+          <Ionicons name="pricetag-outline" size={20} color={DS.primary} />
         </View>
         <View style={styles.cardBody}>
-          <Text style={styles.cardName} numberOfLines={1}>{item.cardName}</Text>
-          <Text style={styles.cardSub}>Sub #{item.id} · User #{item.userId}</Text>
+          <Text style={styles.cardCode} numberOfLines={1}>{item.code}</Text>
+          <Text style={styles.cardSub} numberOfLines={1}>{item.title}</Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
           <View style={[styles.dot, { backgroundColor: sc.fg }]} />
-          <Text style={[styles.statusText, { color: sc.fg }]}>{item.status}</Text>
+          <Text style={[styles.statusText, { color: sc.fg }]}>{sc.label}</Text>
         </View>
+      </View>
+
+      <View style={styles.discountRow}>
+        <Text style={styles.discountText}>{formatDiscount(item)}</Text>
+        {item.minPurchaseAmount != null && (
+          <Text style={styles.discountCaveat}>Min. purchase ₹{item.minPurchaseAmount}</Text>
+        )}
       </View>
 
       <View style={styles.cardMeta}>
         <View style={styles.metaItem}>
-          <Ionicons name="wallet-outline" size={13} color={DS.text3} />
-          <Text style={styles.metaLabel}>Balance</Text>
-          <Text style={[styles.metaValue, { color: DS.success }]}>{formatCurrency(item.walletBalance)}</Text>
+          <Ionicons name="people-outline" size={13} color={DS.text3} />
+          <Text style={styles.metaLabel}>Usage</Text>
+          <Text style={styles.metaValue}>{usage}</Text>
         </View>
         <View style={styles.metaDivider} />
         <View style={styles.metaItem}>
           <Ionicons name="calendar-outline" size={13} color={DS.text3} />
-          <Text style={styles.metaLabel}>Purchased</Text>
-          <Text style={styles.metaValue}>{formatDate(item.purchasedAt)}</Text>
-        </View>
-        <View style={styles.metaDivider} />
-        <View style={styles.metaItem}>
-          <Ionicons name="time-outline" size={13} color={DS.text3} />
-          <Text style={styles.metaLabel}>Expires</Text>
-          <Text style={[styles.metaValue, item.status === 'EXPIRED' && { color: DS.warning }]}>
-            {formatDate(item.expiresAt)}
+          <Text style={styles.metaLabel}>Valid Until</Text>
+          <Text style={[styles.metaValue, isExpired(item) && { color: DS.warning }]}>
+            {formatDate(item.validUntil)}
           </Text>
         </View>
       </View>
@@ -111,12 +123,11 @@ function SubscriptionCard({ item }: { item: SubscriptionResponse }) {
   );
 }
 
-export default function StoreSubscriptionsScreen() {
+export default function MyCouponsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const [storeId, setStoreId]       = useState<number | null>(null);
-  const [subs, setSubs]             = useState<SubscriptionResponse[]>([]);
+  const [coupons, setCoupons]       = useState<CouponResponse[]>([]);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError]           = useState<string | null>(null);
@@ -127,43 +138,35 @@ export default function StoreSubscriptionsScreen() {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     setError(null);
     try {
-      let sid = storeId;
-      if (!sid) {
-        type SR = { success: boolean; data: { id: number }; message?: string; timestamp: string };
-        const res = await axiosInstance.get<SR>(endpoints.store.my);
-        sid = res.data.data.id;
-        setStoreId(sid);
-      }
-      const page = await getStoreSubscriptions(sid, 0, 50);
-      setSubs(page.content ?? []);
+      const list = await getMyCoupons();
+      setCoupons(list);
     } catch (e: any) {
-      setError(getUserMessage(e, 'Could not load subscriptions right now. Please try again.'));
+      setError(e?.message ?? 'Failed to load coupons');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [storeId]);
+  }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const filtered = subs.filter(s => {
-    const matchFilter = filter === 'all' || s.status === filter;
+  const filtered = coupons.filter(c => {
+    const matchFilter = filter === 'all' || couponState(c) === filter;
     const q = search.toLowerCase();
     const matchSearch = !q
-      || s.cardName.toLowerCase().includes(q)
-      || String(s.id).includes(q)
-      || String(s.userId).includes(q);
+      || c.code.toLowerCase().includes(q)
+      || c.title.toLowerCase().includes(q);
     return matchFilter && matchSearch;
   });
 
   const countFor = (f: Filter) =>
-    f === 'all' ? subs.length : subs.filter(s => s.status === f).length;
+    f === 'all' ? coupons.length : coupons.filter(c => couponState(c) === f).length;
 
   const FILTERS: { key: Filter; label: string }[] = [
-    { key: 'all',       label: 'All'       },
-    { key: 'ACTIVE',    label: 'Active'    },
-    { key: 'EXPIRED',   label: 'Expired'   },
-    { key: 'CANCELLED', label: 'Cancelled' },
+    { key: 'all',      label: 'All'      },
+    { key: 'active',   label: 'Active'   },
+    { key: 'expired',  label: 'Expired'  },
+    { key: 'inactive', label: 'Inactive' },
   ];
 
   return (
@@ -177,8 +180,8 @@ export default function StoreSubscriptionsScreen() {
             <Ionicons name="chevron-back" size={22} color={DS.text} />
           </TouchableOpacity>
           <View style={styles.headerText}>
-            <Text style={styles.pageTitle}>Store Subscriptions</Text>
-            <Text style={styles.pageSubtitle}>{subs.length} total</Text>
+            <Text style={styles.pageTitle}>My Coupons</Text>
+            <Text style={styles.pageSubtitle}>{coupons.length} total</Text>
           </View>
         </View>
 
@@ -188,7 +191,7 @@ export default function StoreSubscriptionsScreen() {
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Search by card, sub ID, user…"
+            placeholder="Search by code or title…"
             placeholderTextColor={DS.text3}
             style={styles.searchInput}
           />
@@ -231,7 +234,7 @@ export default function StoreSubscriptionsScreen() {
             tintColor={DS.primary}
           />
         }
-        renderItem={({ item }) => <SubscriptionCard item={item} />}
+        renderItem={({ item }) => <CouponCard item={item} />}
         ListHeaderComponent={loading ? (
           <View style={{ paddingTop: 8 }}>
             {Array(5).fill(0).map((_, i) => <SkeletonCard key={i} />)}
@@ -243,7 +246,7 @@ export default function StoreSubscriptionsScreen() {
               {error ? (
                 <>
                   <Ionicons name="cloud-offline-outline" size={48} color={DS.text3} />
-                  <Text style={styles.emptyTitle}>Could not load subscriptions</Text>
+                  <Text style={styles.emptyTitle}>Could not load coupons</Text>
                   <Text style={styles.emptyDesc}>{error}</Text>
                   <TouchableOpacity style={styles.retryBtn} onPress={() => load()}>
                     <Text style={styles.retryText}>Try Again</Text>
@@ -251,10 +254,10 @@ export default function StoreSubscriptionsScreen() {
                 </>
               ) : (
                 <>
-                  <Ionicons name="people-outline" size={48} color={DS.text3} />
-                  <Text style={styles.emptyTitle}>No subscriptions found</Text>
+                  <Ionicons name="pricetag-outline" size={48} color={DS.text3} />
+                  <Text style={styles.emptyTitle}>No coupons found</Text>
                   <Text style={styles.emptyDesc}>
-                    {search ? 'Try a different search' : 'Subscriptions will appear here'}
+                    {search ? 'Try a different search' : 'Coupons created for you by the admin will appear here'}
                   </Text>
                 </>
               )}
@@ -318,7 +321,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   cardBody: { flex: 1 },
-  cardName: { fontSize: 15, fontWeight: '700', color: DS.text },
+  cardCode: { fontSize: 15, fontWeight: '700', color: DS.text, letterSpacing: 0.3 },
   cardSub:  { fontSize: 12, color: DS.text3, marginTop: 2 },
   statusBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
@@ -326,6 +329,10 @@ const styles = StyleSheet.create({
   },
   dot:        { width: 6, height: 6, borderRadius: 3 },
   statusText: { fontSize: 11, fontWeight: '700' },
+
+  discountRow: { marginBottom: 12 },
+  discountText: { fontSize: 14, fontWeight: '700', color: DS.primary },
+  discountCaveat: { fontSize: 11, color: DS.text3, marginTop: 2 },
 
   cardMeta:   { flexDirection: 'row', alignItems: 'center' },
   metaItem:   { flex: 1, alignItems: 'center', gap: 3 },

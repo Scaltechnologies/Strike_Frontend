@@ -1,10 +1,10 @@
 import { useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList,
-  StyleSheet, StatusBar, ActivityIndicator, RefreshControl, ScrollView,
+  StyleSheet, StatusBar, RefreshControl, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMyDashboard } from '../../modules/dashboard/services/dashboardService';
 import type { DashboardSummaryResponse, ActiveCardSummary } from '../../modules/dashboard/types/dashboard.types';
@@ -120,11 +120,11 @@ function StatGrid({ data }: { data: DashboardSummaryResponse }) {
   );
 }
 
-function CardRow({ card }: { card: ActiveCardSummary }) {
+function CardRow({ card, onPress }: { card: ActiveCardSummary; onPress: () => void }) {
   const name     = card.name ?? 'Card #' + (card.id ?? '—');
   const isActive = card.isActive !== false;
   return (
-    <View style={styles.cardRow}>
+    <TouchableOpacity style={styles.cardRow} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.cardRowIcon}>
         <Ionicons name="card-outline" size={18} color={isActive ? DS.primary : DS.text3} />
       </View>
@@ -137,11 +137,13 @@ function CardRow({ card }: { card: ActiveCardSummary }) {
           {isActive ? 'Active' : 'Inactive'}
         </Text>
       </View>
-    </View>
+      <Ionicons name="chevron-forward" size={16} color={DS.text3} style={{ marginLeft: 4 }} />
+    </TouchableOpacity>
   );
 }
 
 export default function DashboardScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [data, setData]             = useState<DashboardSummaryResponse | null>(null);
   const [loading, setLoading]       = useState(true);
@@ -156,7 +158,7 @@ export default function DashboardScreen() {
       const d = await getMyDashboard();
       setData(d);
     } catch (e: any) {
-      setError(e?.response?.data?.message ?? e?.message ?? 'Failed to load dashboard');
+      setError(e?.message ??'Failed to load dashboard');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -227,7 +229,15 @@ export default function DashboardScreen() {
               tintColor={DS.primary}
             />
           }
-          renderItem={({ item }) => <CardRow card={item} />}
+          renderItem={({ item }) => (
+            <CardRow
+              card={item}
+              onPress={() => {
+                if (item.id == null) return;
+                router.push({ pathname: '/(main)/card-detail', params: { id: String(item.id) } });
+              }}
+            />
+          )}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
               <Ionicons name="card-outline" size={48} color={DS.text3} />

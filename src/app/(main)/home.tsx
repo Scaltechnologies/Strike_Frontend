@@ -1,19 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, FlatList, StyleSheet,
-  StatusBar, ScrollView, Alert, Modal,
-  useWindowDimensions, ActivityIndicator, RefreshControl,
+  StatusBar, ScrollView, Alert, Modal, Image,
+  useWindowDimensions, RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  fetchRedemptionQueue,
-  confirmRedemption,
-  rejectRedemption,
-} from '../../modules/redemption/services/redemptionService';
+import { useFocusEffect } from 'expo-router';
+import { useRedemption } from '../../modules/redemption/store/RedemptionContext';
 import type { RedemptionRequest } from '../../modules/redemption/services/redemptionService';
-import axiosInstance from '../../core/api/axiosInstance';
-import endpoints from '../../core/api/endpoints';
+import { resolveMediaUrl } from '../../core/api/mediaUrl';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -34,6 +30,22 @@ const DS = {
   text2:       '#5A6272',
   text3:       '#9BA3AF',
 };
+
+// ─── Helpers ─────────────────────────────────────────────────────────────
+
+function isSameDay(isoA: string, isoB: string): boolean {
+  // Parse without UTC coercion: JS uses local time for timezone-naive ISO strings,
+  // which is correct for backend-sent IST timestamps (Java LocalDateTime).
+  const a = new Date(isoA);
+  const b = new Date(isoB);
+  // getFullYear / getMonth / getDate all return LOCAL time components, so the
+  // "confirmed today" check is correct even if isoB is a UTC .toISOString() string.
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth()    === b.getMonth()    &&
+    a.getDate()     === b.getDate()
+  );
+}
 
 // ─── Skeleton ────────────────────────────────────────────────────────
 function SkeletonBlock({ w, h, radius = 8 }: { w: number | string; h: number; radius?: number }) {
@@ -173,9 +185,10 @@ function OrderAcceptedModal({ order, visible, onClose }: {
           </View>
 
           <TouchableOpacity
-            style={[styles.proceedBtn, { marginHorizontal: 0, marginTop: 20 }]}
+            style={[styles.proceedBtn, { flex: 0, alignSelf: 'stretch', marginHorizontal: 0, marginTop: 20 }]}
             onPress={onClose} activeOpacity={0.85}
           >
+            <Ionicons name="checkmark" size={18} color="#fff" />
             <Text style={styles.proceedBtnText}>Done</Text>
           </TouchableOpacity>
         </View>
@@ -194,7 +207,6 @@ function OrderPreviewModal({ order, visible, onClose, onConfirmRequest, onReject
 }) {
   const { height: SH } = useWindowDimensions();
   if (!order) return null;
-  const isAccepted = order.status === 'accepted';
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -260,40 +272,31 @@ function OrderPreviewModal({ order, visible, onClose, onConfirmRequest, onReject
             <View style={{ height: 16 }} />
           </ScrollView>
 
-          {/* Actions */}
-          {isAccepted ? (
-            <View style={styles.previewActions}>
-              <View style={styles.confirmedBanner}>
-                <Ionicons name="checkmark-circle" size={18} color={DS.success} />
-                <Text style={styles.confirmedBannerText}>Strike Confirmed</Text>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.previewActions}>
-              <TouchableOpacity
-                style={styles.rejectModalBtn}
-                onPress={() => {
-                  onClose();
-                  Alert.alert('Reject Request', 'Are you sure you want to reject this redemption?', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Reject', style: 'destructive', onPress: () => onReject(order.id) },
-                  ]);
-                }}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="close-circle-outline" size={17} color={DS.primary} />
-                <Text style={styles.rejectModalText}>Reject</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.confirmModalBtn}
-                onPress={() => { onClose(); onConfirmRequest(order); }}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="checkmark-circle" size={17} color="#fff" />
-                <Text style={styles.confirmModalText}>Confirm Strike</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          {/* Actions — only shown for pending items in the queue */}
+          <View style={styles.previewActions}>
+            <TouchableOpacity
+              style={styles.rejectModalBtn}
+              onPress={() => {
+                onClose();
+                Alert.alert('Reject Request', 'Are you sure you want to reject this redemption?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Reject', style: 'destructive', onPress: () => onReject(order.id) },
+                ]);
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="close-circle-outline" size={17} color={DS.primary} />
+              <Text style={styles.rejectModalText}>Reject</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.confirmModalBtn}
+              onPress={() => { onClose(); onConfirmRequest(order); }}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="checkmark-circle" size={17} color="#fff" />
+              <Text style={styles.confirmModalText}>Confirm Strike</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -393,13 +396,21 @@ function QueueRow({ order, onPreview }: {
 // ─── Main Screen ───────────────────────────────────────────────────
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const [storeName, setStoreName]         = useState('');
-  const [storeAddress, setStoreAddress]   = useState('');
-  const [storeId, setStoreId]             = useState<number | null>(null);
-  const [orders, setOrders]               = useState<RedemptionRequest[]>([]);
-  const [loading, setLoading]             = useState(true);
-  const [refreshing, setRefreshing]       = useState(false);
-  const [filter, setFilter]               = useState<'pending' | 'accepted'>('pending');
+  const {
+    storeName,
+    storeAddress,
+    storeLogoUrl,
+    queue,
+    history,
+    loadingQueue,
+    refreshingQueue,
+    errorQueue,
+    loadAll,
+    approveRedemption,
+    rejectRedemption,
+  } = useRedemption();
+
+  const [filter, setFilter]               = useState<'pending' | 'confirmed'>('pending');
   const [previewOrder, setPreview]        = useState<RedemptionRequest | null>(null);
   const [modalVisible, setModal]          = useState(false);
   const [confirmOrder, setConfirmOrder]   = useState<RedemptionRequest | null>(null);
@@ -407,81 +418,56 @@ export default function HomeScreen() {
   const [successOrder, setSuccessOrder]   = useState<RedemptionRequest | null>(null);
   const [successVisible, setSuccessVisible] = useState(false);
 
-  const loadStore = useCallback(async () => {
-    try {
-      type StoreData = { id: number; name: string; address: string };
-      type SR = { success: boolean; data: StoreData; message?: string; timestamp: string };
-      const res = await axiosInstance.get<SR>(endpoints.store.my);
-      const s = res.data.data;
-      setStoreName(s.name);
-      setStoreAddress(s.address);
-      setStoreId(s.id);
-      return s.id;
-    } catch {
-      return null;
-    }
-  }, []);
+  // Reload queue + history every time this tab comes into focus
+  useFocusEffect(useCallback(() => {
+    loadAll();
+  }, [loadAll]));
 
-  const loadQueue = useCallback(async (sid: number, isRefresh = false) => {
-    try {
-      if (isRefresh) setRefreshing(true);
-      const data = await fetchRedemptionQueue(sid);
-      setOrders(data);
-    } catch {
-      Alert.alert('Error', 'Failed to load redemption queue.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  const onRefresh = useCallback(() => loadAll(true), [loadAll]);
 
-  const onRefresh = useCallback(async () => {
-    if (storeId != null) await loadQueue(storeId, true);
-  }, [storeId, loadQueue]);
+  // Pending = everything returned by the queue endpoint (backend filters to PENDING)
+  const pendingOrders = queue;
+  const activeOrder   = pendingOrders[0] ?? null;
+  const queueOrders   = pendingOrders.slice(1);
 
-  useEffect(() => {
-    loadStore().then(sid => {
-      if (sid != null) loadQueue(sid);
-      else setLoading(false);
-    });
-  }, [loadStore, loadQueue]);
-
-  const pendingOrders  = orders.filter(o => o.status === 'pending');
-  const acceptedOrders = orders.filter(o => o.status === 'accepted');
-  const activeOrder    = pendingOrders[0] ?? null;
-  const queueOrders    = pendingOrders.slice(1);
+  // Confirmed today = completed redemptions from history with processedAt (or createdAt) = today
+  const todayISO = new Date().toISOString();
+  const confirmedTodayOrders = history.filter(r => {
+    if (r.status !== 'completed') return false;
+    const ref = r.processedAtRaw ?? r.createdAtRaw;
+    return isSameDay(ref, todayISO);
+  });
 
   const openPreview = (order: RedemptionRequest) => {
-    setPreview(orders.find(o => o.id === order.id) ?? order);
+    setPreview(order);
     setModal(true);
   };
 
   const openConfirmDialog = (order: RedemptionRequest) => {
-    setConfirmOrder(orders.find(o => o.id === order.id) ?? order);
+    setConfirmOrder(order);
     setConfirmVisible(true);
   };
 
   const handleConfirm = async (id: string) => {
+    const orderToShow = queue.find(o => o.id === id) ?? null;
     try {
-      await confirmRedemption(id);
-      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'accepted' as const } : o));
-      const confirmed = orders.find(o => o.id === id);
-      if (confirmed) {
-        setSuccessOrder({ ...confirmed, status: 'accepted' });
+      // Call backend → context reloads queue + history from backend
+      await approveRedemption(id);
+      if (orderToShow) {
+        setSuccessOrder(orderToShow);
         setSuccessVisible(true);
       }
-    } catch {
-      Alert.alert('Error', 'Failed to confirm redemption. Please try again.');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to confirm redemption.');
     }
   };
 
   const handleReject = async (id: string) => {
     try {
       await rejectRedemption(id);
-      setOrders(prev => prev.filter(o => o.id !== id));
       setModal(false);
-    } catch {
-      Alert.alert('Error', 'Failed to reject redemption. Please try again.');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to reject redemption.');
     }
   };
 
@@ -495,7 +481,11 @@ export default function HomeScreen() {
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.headerRow}>
           <View style={styles.storeAvatar}>
-            <Text style={styles.storeAvatarText}>{storeInitials}</Text>
+            {storeLogoUrl ? (
+              <Image source={{ uri: resolveMediaUrl(storeLogoUrl)! }} style={styles.storeAvatarImage} resizeMode="cover" />
+            ) : (
+              <Text style={styles.storeAvatarText}>{storeInitials}</Text>
+            )}
           </View>
           <View style={styles.headerMid}>
             <Text style={styles.storeName} numberOfLines={1}>{storeName || '…'}</Text>
@@ -511,21 +501,21 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Quick stats */}
+        {/* Quick stats — both derived from backend data via context */}
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <Text style={styles.statNumber}>{pendingOrders.length}</Text>
             <Text style={styles.statLabel}>PENDING</Text>
           </View>
           <View style={[styles.statCard, { marginLeft: 10 }]}>
-            <Text style={styles.statNumber}>{acceptedOrders.length}</Text>
+            <Text style={styles.statNumber}>{confirmedTodayOrders.length}</Text>
             <Text style={styles.statLabel}>CONFIRMED TODAY</Text>
           </View>
         </View>
 
         {/* Filter tabs */}
         <View style={styles.filterRow}>
-          {(['pending', 'accepted'] as const).map(f => (
+          {(['pending', 'confirmed'] as const).map(f => (
             <TouchableOpacity
               key={f}
               style={[styles.filterTab, filter === f && styles.filterTabActive]}
@@ -535,7 +525,7 @@ export default function HomeScreen() {
               <Text style={[styles.filterTabText, filter === f && styles.filterTabTextActive]}>
                 {f === 'pending'
                   ? `Pending (${pendingOrders.length})`
-                  : `Accepted (${acceptedOrders.length})`}
+                  : `Confirmed Today (${confirmedTodayOrders.length})`}
               </Text>
             </TouchableOpacity>
           ))}
@@ -544,7 +534,7 @@ export default function HomeScreen() {
 
       {/* Content */}
       <View style={styles.content}>
-        {loading ? (
+        {loadingQueue ? (
           <ScrollView contentContainerStyle={styles.scrollContent}>
             <SkeletonCard />
           </ScrollView>
@@ -553,11 +543,24 @@ export default function HomeScreen() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[styles.scrollContent, { flexGrow: 1 }]}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh}
+              <RefreshControl refreshing={refreshingQueue} onRefresh={onRefresh}
                 colors={[DS.primary]} tintColor={DS.primary} />
             }
           >
-            {activeOrder ? (
+            {errorQueue ? (
+              <View style={styles.emptyWrap}>
+                <Ionicons name="cloud-offline-outline" size={40} color={DS.text3} />
+                <Text style={styles.emptyTitle}>Could not load queue</Text>
+                <Text style={styles.emptyText}>{errorQueue}</Text>
+                <TouchableOpacity
+                  style={[styles.confirmBtn, { width: 140, alignSelf: 'center', height: 44 }]}
+                  onPress={() => loadAll()}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.confirmBtnText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : activeOrder ? (
               <ActiveRedemptionCard
                 order={activeOrder}
                 onPreview={openPreview}
@@ -574,7 +577,7 @@ export default function HomeScreen() {
               </View>
             )}
 
-            {queueOrders.length > 0 && (
+            {!errorQueue && queueOrders.length > 0 && (
               <View style={styles.queueSection}>
                 <Text style={styles.queueSectionLabel}>UP NEXT · {queueOrders.length} WAITING</Text>
                 {queueOrders.map(order => (
@@ -585,12 +588,12 @@ export default function HomeScreen() {
           </ScrollView>
         ) : (
           <FlatList
-            data={acceptedOrders}
+            data={confirmedTodayOrders}
             keyExtractor={o => o.id}
             contentContainerStyle={[styles.scrollContent, { flexGrow: 1 }]}
             showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh}
+              <RefreshControl refreshing={refreshingQueue} onRefresh={onRefresh}
                 colors={[DS.primary]} tintColor={DS.primary} />
             }
             ListEmptyComponent={
@@ -598,16 +601,12 @@ export default function HomeScreen() {
                 <View style={styles.emptyIconWrap}>
                   <Ionicons name="receipt-outline" size={40} color={DS.text3} />
                 </View>
-                <Text style={styles.emptyTitle}>No confirmations yet</Text>
+                <Text style={styles.emptyTitle}>No confirmations yet today</Text>
                 <Text style={styles.emptyText}>Confirmed strikes will appear here.</Text>
               </View>
             }
             renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.acceptedCard}
-                onPress={() => openPreview(item)}
-                activeOpacity={0.8}
-              >
+              <View style={styles.acceptedCard}>
                 <View style={styles.acceptedCardTop}>
                   <Text style={styles.acceptedCustomer} numberOfLines={1}>{item.customer}</Text>
                   <View style={styles.confirmedChip}>
@@ -619,7 +618,7 @@ export default function HomeScreen() {
                   <Text style={styles.acceptedMeta}>{item.totalUnits} items</Text>
                   <Text style={[styles.acceptedMeta, { fontWeight: '700', color: DS.text }]}>₹{item.totalValue}</Text>
                 </View>
-              </TouchableOpacity>
+              </View>
             )}
           />
         )}
@@ -672,7 +671,9 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 12,
     backgroundColor: DS.primary,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    overflow: 'hidden',
   },
+  storeAvatarImage: { width: '100%', height: '100%' },
   storeAvatarText: { fontSize: 14, fontWeight: '800', color: '#fff' },
   headerMid:       { flex: 1, minWidth: 0 },
   storeName:       { fontSize: 17, fontWeight: '800', color: DS.text },
@@ -790,7 +791,7 @@ const styles = StyleSheet.create({
   queueCustomer:   { fontSize: 15, fontWeight: '700', color: DS.text, marginBottom: 2 },
   queueMeta:       { fontSize: 12, color: DS.text3 },
 
-  // Accepted card
+  // Accepted (confirmed today) card
   acceptedCard: {
     backgroundColor: DS.surface, borderRadius: 16,
     padding: 16, marginBottom: 10,
@@ -826,13 +827,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 4,
   },
   timeChipText: { fontSize: 11, color: DS.text3, fontWeight: '500' },
-
-  // Skeleton
-  skeletonCard: {
-    backgroundColor: DS.surface, borderRadius: 20,
-    padding: 18, marginBottom: 14,
-    borderWidth: 1, borderColor: DS.border,
-  },
 
   // Modal shared
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
@@ -952,12 +946,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, paddingTop: 16,
     borderTopWidth: 1, borderTopColor: DS.border,
   },
-  confirmedBanner: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, backgroundColor: DS.successSoft, borderRadius: 14,
-    paddingVertical: 14, borderWidth: 1.5, borderColor: '#A3D9B4',
-  },
-  confirmedBannerText: { fontSize: 15, fontWeight: '700', color: DS.success },
   rejectModalBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 6, borderWidth: 1.5, borderColor: DS.primary, borderRadius: 14, paddingVertical: 13,

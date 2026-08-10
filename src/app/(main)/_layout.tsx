@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { RedemptionProvider } from '../../modules/redemption/store/RedemptionContext';
 
 const PRIMARY = '#CC2200';
 const TEXT_MUTED = '#9BA3AF';
@@ -45,6 +46,7 @@ function CustomTabBar({ state, navigation }: any) {
 
 export default function MainLayout() {
   return (
+    <RedemptionProvider>
     <Tabs
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{ headerShown: false }}
@@ -60,10 +62,15 @@ export default function MainLayout() {
       <Tabs.Screen name="card-create"          options={{ href: null }} />
       <Tabs.Screen name="card-detail"          options={{ href: null }} />
       <Tabs.Screen name="store-subscriptions"  options={{ href: null }} />
+      <Tabs.Screen name="wallet"               options={{ href: null }} />
+      <Tabs.Screen name="my-coupons"           options={{ href: null }} />
       <Tabs.Screen name="redemption-history"   options={{ href: null }} />
+      <Tabs.Screen name="redemption-detail"    options={{ href: null }} />
+      <Tabs.Screen name="store-settings"       options={{ href: null }} />
       <Tabs.Screen name="redeem"               options={{ href: null }} />
       <Tabs.Screen name="customer_history"     options={{ href: null }} />
     </Tabs>
+    </RedemptionProvider>
   );
 }
 

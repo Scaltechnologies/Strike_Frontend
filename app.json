@@ -6,7 +6,8 @@
     "scheme": "strike-frontend",
     "platforms": [
       "ios",
-      "android"
+      "android",
+      "web"
     ],
     "android": {
       "adaptiveIcon": {
@@ -30,7 +31,13 @@
         }
       ],
       "expo-secure-store",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Strike needs access to your photos so you can set a banner image for your store."
+        }
+      ]
     ],
     "extra": {
       "eas": {

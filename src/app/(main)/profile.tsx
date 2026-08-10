@@ -12,10 +12,12 @@ import {
   getVendorProfileStatus,
 } from '../../modules/vendor/services/vendorProfileService';
 import { getMyCards } from '../../modules/cards/services/cardService';
+import { getMyStore } from '../../modules/store/services/storeService';
 import type {
   VendorProfileResponse,
   VendorProfileStatus,
 } from '../../modules/vendor/types/vendor.types';
+import type { StoreStatus } from '../../modules/store/types/store.types';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -38,6 +40,13 @@ function statusStyle(s: string): { bg: string; fg: string } {
   if (s === 'ACTIVE')                       return { bg: DS.successSoft, fg: DS.success };
   if (s === 'SUSPENDED' || s === 'REJECTED') return { bg: DS.errorSoft,   fg: DS.error   };
   return { bg: DS.warningSoft, fg: DS.warning };
+}
+
+function storeStatusMeta(s: StoreStatus | null): { label: string; color: string } {
+  if (s === 'ACTIVE')             return { label: 'Open',   color: DS.success };
+  if (s === 'TEMPORARILY_CLOSED') return { label: 'Closed', color: DS.warning };
+  if (s === 'INACTIVE')           return { label: 'Inactive', color: DS.text3 };
+  return { label: '—', color: DS.text3 };
 }
 
 interface NavRowDef {
@@ -90,21 +99,24 @@ function Section({ title, rows }: { title: string; rows: NavRowDef[] }) {
 export default function ProfileScreen() {
   const router   = useRouter();
   const insets   = useSafeAreaInsets();
-  const [profile, setProfile]     = useState<VendorProfileResponse | null>(null);
-  const [vstatus, setVstatus]     = useState<VendorProfileStatus | null>(null);
+  const [profile, setProfile]         = useState<VendorProfileResponse | null>(null);
+  const [vstatus, setVstatus]         = useState<VendorProfileStatus | null>(null);
   const [activeCards, setActiveCards] = useState<number | null>(null);
-  const [loading, setLoading]     = useState(true);
+  const [storeStatus, setStoreStatus] = useState<StoreStatus | null>(null);
+  const [loading, setLoading]         = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const [p, s, cards] = await Promise.all([
+      const [p, s, cards, store] = await Promise.all([
         getVendorProfile(),
         getVendorProfileStatus(),
         getMyCards(),
+        getMyStore().catch(() => null),
       ]);
       setProfile(p);
       setVstatus(s);
       setActiveCards(cards.filter(c => c.isActive).length);
+      setStoreStatus(store?.status ?? null);
     } catch {
       // profile degrades gracefully — logout still works
     } finally {
@@ -134,6 +146,13 @@ export default function ProfileScreen() {
 
   const businessRows: NavRowDef[] = [
     {
+      id: 'wallet',
+      icon: 'wallet-outline',
+      label: 'Wallet',
+      subtitle: 'Balance, payouts, and withdrawal requests',
+      onPress: () => router.push('/(main)/wallet'),
+    },
+    {
       id: 'cards',
       icon: 'card-outline',
       label: 'My Cards',
@@ -154,6 +173,13 @@ export default function ProfileScreen() {
       subtitle: 'View all processed redemptions',
       onPress: () => router.push('/(main)/redemption-history'),
     },
+    {
+      id: 'my-coupons',
+      icon: 'pricetag-outline',
+      label: 'My Coupons',
+      subtitle: 'View discount coupons available for your store',
+      onPress: () => router.push('/(main)/my-coupons'),
+    },
   ];
 
   const accountRows: NavRowDef[] = [
@@ -169,8 +195,7 @@ export default function ProfileScreen() {
       icon: 'storefront-outline',
       label: 'Store Settings',
       subtitle: 'Hours, holidays, and location',
-      onPress: () => {},
-      disabled: true,
+      onPress: () => router.push('/(main)/store-settings'),
     },
   ];
 
@@ -231,14 +256,26 @@ export default function ProfileScreen() {
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <Text style={styles.statValue}>{vstatus.commissionRate}%</Text>
-              <Text style={styles.statLabel}>COMMISSION RATE</Text>
+              <Text style={styles.statLabel}>COMMISSION</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statCard}>
               <Text style={[styles.statValue, { color: DS.success }]}>
                 {activeCards ?? '—'}
               </Text>
-              <Text style={styles.statLabel}>ACTIVE CARDS</Text>
+              <Text style={styles.statLabel}>CARDS</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statCard}>
+              {(() => {
+                const sm = storeStatusMeta(storeStatus);
+                return (
+                  <>
+                    <Text style={[styles.statValue, { color: sm.color }]}>{sm.label}</Text>
+                    <Text style={styles.statLabel}>STORE</Text>
+                  </>
+                );
+              })()}
             </View>
           </View>
         )}
@@ -300,7 +337,7 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1, alignItems: 'center', paddingVertical: 16,
   },
-  statValue:   { fontSize: 24, fontWeight: '800', color: DS.primary, marginBottom: 3 },
+  statValue:   { fontSize: 20, fontWeight: '800', color: DS.primary, marginBottom: 3 },
   statLabel:   { fontSize: 10, fontWeight: '700', color: DS.text3, letterSpacing: 0.5 },
   statDivider: { width: 1, height: 44, backgroundColor: DS.border },
 

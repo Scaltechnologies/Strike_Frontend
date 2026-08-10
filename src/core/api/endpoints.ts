@@ -26,7 +26,8 @@ const endpoints = {
   store: {
     my:         '/api/vendor/stores/my',
     myLocation: '/api/vendor/stores/my/location',
-    myStatus:   '/api/stores/my/status',
+    myStatus:   '/api/vendor/stores/my/status',
+    myBanner:   '/api/vendor/stores/my/banner',
     timings:    (storeId: number) => `/api/vendor/stores/${storeId}/timings`,
     timing:     (storeId: number, timingId: number) => `/api/vendor/stores/${storeId}/timings/${timingId}`,
     holidays:   (storeId: number) => `/api/vendor/stores/${storeId}/holidays`,
@@ -57,10 +58,10 @@ const endpoints = {
 
   // ── Redemption ─────────────────────────────────────────────────────
   // VendorRedemptionController → /api/redemptions
-  // approve/reject id kept as string for backward-compat with existing redemptionService.ts
   redemption: {
     queue:   (storeId: number) => `/api/redemptions/store/${storeId}/queue`,
     history: (storeId: number) => `/api/redemptions/store/${storeId}`,
+    detail:  (id: string | number) => `/api/redemptions/${id}`,
     approve: (id: string) => `/api/redemptions/${id}/approve`,
     reject:  (id: string) => `/api/redemptions/${id}/reject`,
   },
@@ -72,10 +73,10 @@ const endpoints = {
   },
 
   // ── Dashboard ──────────────────────────────────────────────────────
-  // DashboardController → /api/vendor/dashboard
+  // DashboardController → /api/dashboard
   dashboard: {
-    my:    '/api/vendor/dashboard/my',
-    store: (storeId: number) => `/api/vendor/dashboard/store/${storeId}`,
+    my:    '/api/dashboard/my',
+    store: (storeId: number) => `/api/dashboard/store/${storeId}`,
   },
 
   // ── Analytics ──────────────────────────────────────────────────────
@@ -83,6 +84,21 @@ const endpoints = {
   analytics: {
     my:    '/api/analytics/my',
     store: (storeId: number) => `/api/analytics/store/${storeId}`,
+  },
+
+  // ── Coupons ────────────────────────────────────────────────────────
+  // CouponController → /api/vendor/coupons (auth required, VENDOR role)
+  coupon: {
+    my: '/api/vendor/coupons/my',
+  },
+
+  // ── Withdrawals / Wallet ──────────────────────────────────────────────
+  // VendorWithdrawalController → /api/vendor/withdrawals (auth required, VENDOR role)
+  // Thin proxy to admin-service (RestTemplate passthrough) — responses are raw JSON,
+  // NOT wrapped in the usual ApiResponse<T> envelope.
+  withdrawal: {
+    my:    '/api/vendor/withdrawals',
+    stats: '/api/vendor/withdrawals/stats',
   },
 
 } as const;

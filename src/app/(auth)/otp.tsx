@@ -25,7 +25,7 @@ const BOX_GAP = 10;
 const BOX_SIZE = (width - 48 - (OTP_LENGTH - 1) * BOX_GAP) / OTP_LENGTH;
 
 export default function OtpScreen() {
-  const { phoneNumber } = useLocalSearchParams<{ phoneNumber: string }>();
+  const { phoneNumber, bannerUri } = useLocalSearchParams<{ phoneNumber: string; bannerUri?: string }>();
   const { handleVerifyOtp, loading, error } = useVerifyOtp();
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const inputs = useRef<(TextInput | null)[]>([]);
@@ -47,7 +47,7 @@ export default function OtpScreen() {
   const onVerify = () => {
     const code = otp.join('');
     if (code.length < OTP_LENGTH) return;
-    handleVerifyOtp(phoneNumber, code);
+    handleVerifyOtp(phoneNumber, code, bannerUri || undefined);
   };
 
   const maskedPhone = phoneNumber ? `+91 XXXXXX${phoneNumber.slice(-4)}` : '';

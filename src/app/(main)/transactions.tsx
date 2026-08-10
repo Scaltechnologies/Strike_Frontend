@@ -1,15 +1,17 @@
 import { useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList,
-  StyleSheet, StatusBar, ActivityIndicator, RefreshControl,
+  StyleSheet, StatusBar, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getStoreTransactions } from '../../modules/ledger/services/ledgerService';
 import type { TransactionResponse, TransactionType } from '../../modules/ledger/types/ledger.types';
+import { getWithdrawalStats } from '../../modules/wallet/services/walletService';
 import axiosInstance from '../../core/api/axiosInstance';
 import endpoints from '../../core/api/endpoints';
+import { getUserMessage } from '../../core/api/errorMessage';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -26,8 +28,8 @@ const DS = {
 
 type Filter = 'all' | TransactionType;
 
-function formatCurrency(n: number) {
-  return '₹' + n.toLocaleString('en-IN');
+function formatCurrency(n: number | null | undefined) {
+  return '₹' + (n ?? 0).toLocaleString('en-IN');
 }
 
 function txLabel(type: TransactionType) {
@@ -89,6 +91,7 @@ function SkeletonRow() {
 }
 
 export default function TransactionsScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [storeId, setStoreId]       = useState<number | null>(null);
   const [transactions, setTxs]      = useState<TransactionResponse[]>([]);
@@ -97,10 +100,16 @@ export default function TransactionsScreen() {
   const [error, setError]           = useState<string | null>(null);
   const [filter, setFilter]         = useState<Filter>('all');
   const [search, setSearch]         = useState('');
+  const [walletBalance, setWalletBalance]     = useState<number | null>(null);
+  const [walletError, setWalletError]         = useState<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     setError(null);
+    setWalletError(null);
+
+    const statsPromise = getWithdrawalStats();
+
     try {
       let sid = storeId;
       if (!sid) {
@@ -111,12 +120,19 @@ export default function TransactionsScreen() {
       }
       const page = await getStoreTransactions(sid, 0, 50);
       setTxs(page.content ?? []);
-    } catch (e: any) {
-      setError(e?.response?.data?.message ?? e?.message ?? 'Failed to load transactions');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    } catch (e) {
+      setError(getUserMessage(e, 'Failed to load transactions'));
     }
+
+    try {
+      const stats = await statsPromise;
+      setWalletBalance(stats.availableBalance);
+    } catch (e) {
+      setWalletError(getUserMessage(e, 'Could not load wallet balance'));
+    }
+
+    setLoading(false);
+    setRefreshing(false);
   }, [storeId]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -175,6 +191,24 @@ export default function TransactionsScreen() {
             </View>
           </View>
         </View>
+
+        {/* Wallet balance */}
+        <TouchableOpacity
+          style={styles.walletBanner}
+          onPress={() => router.push('/(main)/wallet')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.walletIcon}>
+            <Ionicons name="wallet-outline" size={18} color={DS.primary} />
+          </View>
+          <View style={styles.walletBody}>
+            <Text style={styles.walletLabel}>Wallet Balance</Text>
+            <Text style={styles.walletValue}>
+              {walletError ? '—' : walletBalance === null ? '···' : formatCurrency(walletBalance)}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={DS.text3} />
+        </TouchableOpacity>
 
         {/* Search */}
         <View style={styles.searchRow}>
@@ -324,6 +358,19 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontSize: 13, fontWeight: '700' },
 
+  walletBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: DS.primarySoft, borderRadius: 14,
+    paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12,
+  },
+  walletIcon: {
+    width: 36, height: 36, borderRadius: 10, backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  walletBody:  { flex: 1 },
+  walletLabel: { fontSize: 12, color: DS.text2, fontWeight: '600' },
+  walletValue: { fontSize: 18, color: DS.primary, fontWeight: '800', marginTop: 2 },
+
   searchRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: DS.bg, borderRadius: 12, borderWidth: 1, borderColor: DS.border,
@@ -340,10 +387,18 @@ const styles = StyleSheet.create({
   filterChipActive:     { backgroundColor: DS.primary, borderColor: DS.primary },
   filterChipText:       { fontSize: 13, fontWeight: '600', color: DS.text2 },
   filterChipTextActive: { color: '#fff' },
-  filterBadge:          { backgroundColor: DS.bg, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 },
-  filterBadgeActive:    { backgroundColor: 'rgba(255,255,255,0.2)' },
-  filterBadgeText:      { fontSize: 11, fontWeight: '700', color: DS.text3 },
-  filterBadgeTextActive:{ color: '#fff' },
+  filterBadge: {
+    backgroundColor: DS.bg,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  filterBadgeActive:     { backgroundColor: 'rgba(255,255,255,0.3)' },
+  filterBadgeText:       { fontSize: 11, fontWeight: '700', color: DS.text2 },
+  filterBadgeTextActive: { color: '#fff' },
 
   listContent: { paddingHorizontal: 16, paddingTop: 16, flexGrow: 1 },
 

@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { sendOtp, verifyOtp, registerVendor } from '../services/authService';
 import { saveTokens } from '../../../core/storage/secureStorage';
 import { RegisterVendorRequest } from '../types/auth.types';
+import { uploadStoreBanner } from '../../store/services/storeService';
 
 // ── Send OTP Hook (Login flow) ────────────────────────────────────────
 // POST /api/auth/vendor/login — vendor must already be ACTIVE
@@ -37,7 +38,12 @@ export const useVerifyOtp = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleVerifyOtp = async (mobileNumber: string, otp: string) => {
+  // bannerUri: local device image picked on the registration screen, carried
+  // through as a route param since no auth token exists until this call
+  // succeeds. Uploaded best-effort right after login — a failure here must
+  // not block the vendor from reaching the app (they can still set it later
+  // from Store Settings).
+  const handleVerifyOtp = async (mobileNumber: string, otp: string, bannerUri?: string) => {
     try {
       setLoading(true);
       setError(null);
@@ -48,9 +54,20 @@ export const useVerifyOtp = () => {
       if (response.status === 'ACTIVE') {
         // Map backend `token` field to `accessToken` for secureStorage
         await saveTokens({ accessToken: response.token, refreshToken: response.refreshToken });
+
+        if (bannerUri) {
+          try {
+            await uploadStoreBanner(bannerUri);
+          } catch (bannerErr) {
+            console.warn('Banner upload after registration failed:', bannerErr);
+          }
+        }
+
         router.replace('/(main)/home');
       } else {
-        // PENDING, VERIFIED, SUSPENDED, REJECTED — not yet approved
+        // PENDING, VERIFIED, SUSPENDED, REJECTED — not yet approved.
+        // No token was issued, so the picked banner can't be uploaded yet;
+        // the vendor can set it from Store Settings once approved.
         router.replace('/(auth)/pending-approval');
       }
     } catch (err: any) {
@@ -69,14 +86,14 @@ export const useRegister = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleRegister = async (payload: RegisterVendorRequest) => {
+  const handleRegister = async (payload: RegisterVendorRequest, bannerUri?: string) => {
     try {
       setLoading(true);
       setError(null);
       await registerVendor(payload);
       router.push({
         pathname: '/(auth)/otp',
-        params: { phoneNumber: payload.mobileNumber },
+        params: { phoneNumber: payload.mobileNumber, bannerUri: bannerUri ?? '' },
       });
     } catch (err: any) {
       setError(err.message || 'Registration failed');

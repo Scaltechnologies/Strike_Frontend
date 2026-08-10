@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useRegister } from '../../modules/auth/hooks/useAuth';
+import BannerPicker from '../../modules/store/components/BannerPicker';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -43,6 +44,7 @@ export default function SignupScreen() {
   const [longitude, setLongitude]       = useState('');
   const [locLoading, setLocLoading]     = useState(false);
   const [locError, setLocError]         = useState<string | null>(null);
+  const [bannerUri, setBannerUri]       = useState<string | null>(null);
 
   const coordsSet    = latitude.trim().length > 0 && longitude.trim().length > 0;
   const isFormValid  = !!(hotelName.trim() && address.trim() && email.trim() && mobileNumber.trim() && coordsSet);
@@ -75,7 +77,7 @@ export default function SignupScreen() {
       email:        email.trim(),
       latitude:     parseFloat(latitude),
       longitude:    parseFloat(longitude),
-    });
+    }, bannerUri ?? undefined);
   };
 
   return (
@@ -109,6 +111,15 @@ export default function SignupScreen() {
 
         {/* ── BUSINESS INFO ── */}
         <Text style={styles.sectionLabel}>BUSINESS INFO</Text>
+
+        <View style={{ marginBottom: 16 }}>
+          <BannerPicker
+            uri={bannerUri}
+            onPick={setBannerUri}
+            onRemove={() => setBannerUri(null)}
+            label="Store Banner (optional)"
+          />
+        </View>
 
         <Text style={styles.inputLabel}>Business Name *</Text>
         <TextInput

@@ -60,13 +60,13 @@ export interface UpdateStoreLocationRequest {
 
 // Request: POST /api/vendor/stores/{id}/timings
 // dayOfWeek is Java DayOfWeek — MONDAY … SUNDAY
-// openTime / closeTime are LocalTime strings "HH:mm" or "HH:mm:ss"
-// isClosed: when true, openTime and closeTime may be null
+// openTime / closeTime must be "HH:mm:ss" (Java LocalTime default format)
+// When isClosed is true, send null (not undefined) so Spring doesn't NPE on absent fields
 export interface StoreTimingRequest {
   dayOfWeek: DayOfWeek;
-  openTime?: string;
-  closeTime?: string;
-  isClosed?: boolean;
+  openTime: string | null;
+  closeTime: string | null;
+  isClosed: boolean;
 }
 
 // Response: GET/POST /api/vendor/stores/{id}/timings
