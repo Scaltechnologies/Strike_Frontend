@@ -1,17 +1,20 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet,
+  View, TouchableOpacity, FlatList, StyleSheet,
   StatusBar, Switch, Image, Alert, Modal, ScrollView, Animated,
-  Platform, Keyboard, KeyboardAvoidingView, Share, useWindowDimensions,
+  Platform, Keyboard, KeyboardAvoidingView, Share,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import Text from '../../../components/Text';
+import TextInput from '../../../components/TextInput';
 import { Ionicons } from '@expo/vector-icons';
 import {
   useMenu,
   CategoryResponse,
   MenuItemResponse,
   CreateMenuItemRequest,
-} from '../../modules/menu/hooks/useMenu';
+} from '../../../modules/menu/hooks/useMenu';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -373,7 +376,6 @@ function DetailSheet({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const { width: SW } = useWindowDimensions();
   if (!item) return null;
 
   const catName = categories.find(c => c.id === item.categoryId)?.name ?? 'Uncategorized';
@@ -387,47 +389,61 @@ function DetailSheet({
         activeOpacity={1}
       />
       <View style={styles.detailSheet}>
-        <View style={styles.sheetHandle} />
+        <LinearGradient
+          colors={[DS.primary, DS.primaryDark]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.detailHeader}
+        >
+          <View style={styles.sheetHandleLight} />
 
-        {item.imageUrl ? (
-          <Image
-            source={{ uri: item.imageUrl }}
-            style={[styles.detailImg, { width: SW - 32 }]}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[styles.detailImg, styles.detailImgPlaceholder, { width: SW - 32 }]}>
-            <Ionicons name="restaurant-outline" size={40} color={DS.text3} />
+          <TouchableOpacity
+            style={styles.detailCloseBtn}
+            onPress={onClose}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="close" size={18} color="#fff" />
+          </TouchableOpacity>
+
+          <View style={styles.detailEyebrowRow}>
+            {item.itemType && (
+              <View style={styles.detailTypeChip}>
+                <View style={[
+                  styles.typeIndicator,
+                  { backgroundColor: item.itemType === 'VEG' ? '#4ADE80' : '#FF8A80' },
+                ]} />
+                <Text style={styles.detailTypeChipText}>
+                  {item.itemType === 'VEG' ? 'Veg' : 'Non-Veg'}
+                </Text>
+              </View>
+            )}
+            <Text style={styles.detailEyebrow} numberOfLines={1}>{catName}</Text>
           </View>
-        )}
+
+          <Text style={styles.detailHeaderName} numberOfLines={2}>{item.name}</Text>
+
+          <View style={styles.detailHeaderBottomRow}>
+            <Text style={styles.detailPriceBig}>₹{item.price}</Text>
+            <View style={[
+              styles.headerStatusChip,
+              { backgroundColor: isAvail ? 'rgba(74,222,128,0.2)' : 'rgba(255,138,128,0.2)' },
+            ]}>
+              <View style={[styles.statusDot, { backgroundColor: isAvail ? '#4ADE80' : '#FF8A80' }]} />
+              <Text style={[styles.headerStatusText, { color: isAvail ? '#4ADE80' : '#FF8A80' }]}>
+                {isAvail ? 'Available' : 'Out of stock'}
+              </Text>
+            </View>
+          </View>
+        </LinearGradient>
 
         <View style={styles.detailBody}>
-          <View style={styles.detailTopRow}>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                {item.itemType && (
-                  <View style={[
-                    styles.typeIndicator,
-                    { backgroundColor: item.itemType === 'VEG' ? DS.success : DS.error },
-                  ]} />
-                )}
-                <Text style={styles.detailName} numberOfLines={2}>{item.name}</Text>
-              </View>
-              <Text style={styles.detailCat}>{catName}</Text>
+          {!!item.description && (
+            <View style={styles.detailDescCard}>
+              <Text style={styles.detailDesc}>{item.description}</Text>
             </View>
-            <Text style={styles.detailPrice}>₹{item.price}</Text>
-          </View>
+          )}
 
-          <View style={[styles.statusChip, { backgroundColor: isAvail ? DS.successSoft : DS.errorSoft }]}>
-            <View style={[styles.statusDot, { backgroundColor: isAvail ? DS.success : DS.error }]} />
-            <Text style={[styles.statusText, { color: isAvail ? DS.success : DS.error }]}>
-              {isAvail ? 'Available' : 'Out of stock'}
-            </Text>
-          </View>
-
-          {!!item.description && <Text style={styles.detailDesc}>{item.description}</Text>}
-
-          <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
+          <TouchableOpacity style={styles.editBtn} onPress={onEdit} activeOpacity={0.85}>
             <Ionicons name="create-outline" size={16} color="#fff" />
             <Text style={styles.editBtnText}>Edit Item</Text>
           </TouchableOpacity>
@@ -436,13 +452,15 @@ function DetailSheet({
             <TouchableOpacity
               style={styles.secondaryBtn}
               onPress={() => Share.share({ message: `${item.name} – ₹${item.price}` })}
+              activeOpacity={0.75}
             >
               <Ionicons name="share-outline" size={15} color={DS.text2} />
               <Text style={styles.secondaryBtnText}>Share</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.secondaryBtn, { borderColor: DS.errorSoft, backgroundColor: DS.errorSoft }]}
+              style={[styles.secondaryBtn, styles.secondaryBtnDanger]}
               onPress={onDelete}
+              activeOpacity={0.75}
             >
               <Ionicons name="trash-outline" size={15} color={DS.error} />
               <Text style={[styles.secondaryBtnText, { color: DS.error }]}>Delete</Text>
@@ -1081,40 +1099,72 @@ const styles = StyleSheet.create({
   // Detail sheet (no keyboard interaction needed — stays position:absolute)
   detailSheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: DS.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22,
-    paddingBottom: 32, paddingTop: 12,
-    borderTopWidth: 1, borderColor: DS.border,
+    backgroundColor: DS.surface, borderTopLeftRadius: 26, borderTopRightRadius: 26,
+    overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.18, shadowRadius: 24, elevation: 14,
   },
-  detailImg: {
-    alignSelf: 'center', height: 170, borderRadius: 12,
-    backgroundColor: DS.bg, marginBottom: 16, marginHorizontal: 16,
+
+  // Gradient hero header — replaces the old photo/placeholder block
+  detailHeader: { paddingTop: 12, paddingHorizontal: 20, paddingBottom: 26 },
+  sheetHandleLight: {
+    width: 36, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.45)', alignSelf: 'center', marginBottom: 18,
   },
-  detailImgPlaceholder: {
-    alignItems: 'center', justifyContent: 'center', backgroundColor: DS.primarySoft,
+  detailCloseBtn: {
+    position: 'absolute', top: 14, right: 16,
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center', justifyContent: 'center',
   },
-  detailBody:   { paddingHorizontal: 20 },
-  detailTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 10 },
-  detailName:   { fontSize: 20, fontWeight: '800', color: DS.text, letterSpacing: -0.3 },
-  detailCat:    { fontSize: 13, color: DS.text3, fontWeight: '500', marginTop: 3 },
-  detailPrice:  { fontSize: 22, fontWeight: '700', color: DS.primary, flexShrink: 0 },
-  statusChip: {
-    flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start',
-    gap: 6, paddingHorizontal: 10, paddingVertical: 5,
-    borderRadius: 20, marginBottom: 12,
+  detailEyebrowRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, paddingRight: 36,
   },
-  statusDot:  { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 13, fontWeight: '600' },
-  detailDesc: { fontSize: 14, color: DS.text2, lineHeight: 20, marginBottom: 14 },
+  detailTypeChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
+  },
+  detailTypeChipText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  detailEyebrow: {
+    fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.75)',
+    textTransform: 'uppercase', letterSpacing: 0.6, flexShrink: 1,
+  },
+  detailHeaderName: {
+    fontSize: 24, fontWeight: '800', color: '#fff',
+    letterSpacing: -0.3, marginBottom: 16, paddingRight: 30,
+  },
+  detailHeaderBottomRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  detailPriceBig: { fontSize: 30, fontWeight: '800', color: '#fff' },
+  headerStatusChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20,
+  },
+  headerStatusText: { fontSize: 12, fontWeight: '700' },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+
+  // Body
+  detailBody: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32 },
+  detailDescCard: {
+    backgroundColor: DS.bg, borderRadius: 14, padding: 14,
+    marginBottom: 18, borderLeftWidth: 3, borderLeftColor: DS.primary,
+  },
+  detailDesc: { fontSize: 14, color: DS.text2, lineHeight: 21 },
   editBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, backgroundColor: DS.primary, borderRadius: 12, height: 50, marginBottom: 10,
+    gap: 8, backgroundColor: DS.primary, borderRadius: 14, height: 52, marginBottom: 12,
+    shadowColor: DS.primary, shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3, shadowRadius: 10, elevation: 5,
   },
   editBtnText:        { fontSize: 15, fontWeight: '700', color: '#fff' },
-  detailSecondaryRow: { flexDirection: 'row', gap: 8 },
+  detailSecondaryRow: { flexDirection: 'row', gap: 10 },
   secondaryBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 5, height: 42, borderRadius: 10,
+    gap: 6, height: 46, borderRadius: 12,
     borderWidth: 1, borderColor: DS.border, backgroundColor: DS.bg,
   },
-  secondaryBtnText: { fontSize: 13, fontWeight: '600', color: DS.text2 },
+  secondaryBtnDanger: { borderColor: DS.errorSoft, backgroundColor: DS.errorSoft },
+  secondaryBtnText:   { fontSize: 13, fontWeight: '600', color: DS.text2 },
 });

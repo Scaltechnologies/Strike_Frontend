@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, FlatList,
+  View, TouchableOpacity, FlatList,
   StyleSheet, StatusBar,
   Dimensions, ScrollView, Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Text from '../../components/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
@@ -174,17 +175,19 @@ const MOCK_TRANSACTIONS: Transaction[] = [
   },
 ];
 
-// ─── Gradient config per card type ─────────────────────────────────
-const CARD_GRADIENT: Record<MealCard['type'], readonly [string, string, ...string[]]> = {
-  'Curry Card':     ['#E53935', '#B71C1C'],
-  'Breakfast Card': ['#7CB342', '#F9A825'],
-  'All in one':     ['#4A0000', '#1A0000'],
+// ─── Tonal gradient + food icon per card type ───────────────────────
+// Each gradient stays within one hue (brand red / brand gold / neutral
+// charcoal) so it reads as a subtle sheen, not a multi-color blend.
+const CARD_GRADIENT: Record<MealCard['type'], readonly [string, string]> = {
+  'Curry Card':     ['#DB3A12', '#7A1400'], // brand red, light → dark
+  'Breakfast Card': ['#D9A44A', '#8C5A1E'], // brand gold, light → dark
+  'All in one':     ['#4A4A4A', '#1A1A1A'], // charcoal, light → dark
 };
 
-const CARD_BADGE_COLOR: Record<MealCard['type'], string> = {
-  'Curry Card':     '#CC2200',
-  'Breakfast Card': '#558B2F',
-  'All in one':     '#7B1111',
+const CARD_ICON: Record<MealCard['type'], React.ComponentProps<typeof Ionicons>['name']> = {
+  'Curry Card':     'flame-outline',
+  'Breakfast Card': 'cafe-outline',
+  'All in one':     'fast-food-outline',
 };
 
 // ─── Transaction Detail Modal ───────────────────────────────────────
@@ -229,7 +232,6 @@ function TransactionDetailModal({
               <View style={[styles.cardTypePill, isFailed && styles.cardTypePillFailed]}>
                 <Text style={styles.cardTypePillText}>{tx.cardName}</Text>
               </View>
-              <Text style={styles.modalCardId}>{tx.cardId}</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Ionicons name="close" size={20} color={Colors.textDark} />
@@ -358,21 +360,30 @@ function StrikeLogo() {
 
 // ─── Meal Card ──────────────────────────────────────────────────────
 function MealCardItem({ card }: { card: MealCard }) {
-  const progress   = card.used / card.total;
-  const gradient   = CARD_GRADIENT[card.type];
-  const badgeColor = CARD_BADGE_COLOR[card.type];
+  const progress = card.used / card.total;
+  const [colorLight, colorDark] = CARD_GRADIENT[card.type];
+  const icon = CARD_ICON[card.type];
 
   return (
     <LinearGradient
-      colors={gradient}
+      colors={[colorLight, colorDark]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.mealCard}
     >
+      {/* Large, faint watermark icon — food-type identity without a
+          separate solid chip competing with the text */}
+      <Ionicons
+        name={icon}
+        size={104}
+        color="rgba(255,255,255,0.10)"
+        style={styles.mealCardWatermark}
+      />
+
       {/* Top row: badge + logo */}
       <View style={styles.mealCardTop}>
-        <View style={[styles.cardBadge, { backgroundColor: badgeColor }]}>
-          <Text style={styles.cardBadgeText}>{card.type}</Text>
+        <View style={styles.cardBadge}>
+          <Text style={[styles.cardBadgeText, { color: colorDark }]}>{card.type}</Text>
         </View>
         <StrikeLogo />
       </View>
@@ -381,22 +392,22 @@ function MealCardItem({ card }: { card: MealCard }) {
       <Text style={styles.mealCardRestaurant}>{card.restaurant}</Text>
       <Text style={styles.mealCardAddress}>{card.address}</Text>
 
-      {/* Progress bar */}
-      <View style={styles.progressBarTrack}>
-        <View style={[styles.progressBarFill, { width: `${progress * 100}%` }]} />
+      {/* Usage */}
+      <View style={styles.usageSection}>
+        <View style={styles.usageLabelRow}>
+          <Text style={styles.usageLabel}>REDEMPTIONS</Text>
+          <Text style={styles.usageCount}>{card.used} / {card.total}</Text>
+        </View>
+        <View style={styles.progressBarTrack}>
+          <View style={[styles.progressBarFill, { width: `${progress * 100}%` }]} />
+        </View>
       </View>
 
-      {/* Bottom row: used + view card */}
-      <View style={styles.mealCardBottom}>
-        <Text style={styles.mealCardUsed}>
-          <Text style={styles.mealCardUsedCount}>{card.used}/{card.total}</Text>
-          {'  '}Used
-        </Text>
-        <TouchableOpacity style={styles.viewCardBtn} activeOpacity={0.8}>
-          <Text style={styles.viewCardText}>View Card</Text>
-          <Ionicons name="chevron-forward" size={14} color="#fff" />
-        </TouchableOpacity>
-      </View>
+      {/* View card */}
+      <TouchableOpacity style={styles.viewCardBtn} activeOpacity={0.85}>
+        <Text style={[styles.viewCardText, { color: colorDark }]}>View Card</Text>
+        <Ionicons name="chevron-forward" size={14} color={colorDark} />
+      </TouchableOpacity>
     </LinearGradient>
   );
 }
@@ -427,7 +438,7 @@ function TransactionRow({
         </View>
 
         <View style={styles.txInfo}>
-          <Text style={styles.txCardName}>{tx.cardName} {tx.cardId}</Text>
+          <Text style={styles.txCardName}>{tx.cardName}</Text>
           <Text style={styles.txRestaurant}>@ {tx.restaurant}</Text>
         </View>
 
@@ -647,34 +658,51 @@ const styles = StyleSheet.create({
 
   // ── Meal Card ──
   mealCard: {
-    borderRadius: 20, padding: 18, marginBottom: 14,
+    borderRadius: 20, padding: 20, marginBottom: 14, overflow: 'hidden',
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18, shadowRadius: 10, elevation: 6,
+    shadowOpacity: 0.16, shadowRadius: 10, elevation: 6,
+  },
+  mealCardWatermark: {
+    position: 'absolute', right: -18, bottom: -18,
   },
   mealCardTop: {
     flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 14,
+    alignItems: 'center', marginBottom: 16,
   },
   cardBadge: {
-    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
+    backgroundColor: '#fff', borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 5,
   },
-  cardBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  cardBadgeText: { fontSize: 12, fontWeight: '700' },
   StrikeLogo:     { fontSize: 18, fontWeight: '700', color: '#fff', fontStyle: 'italic' },
   StrikeC:        { fontSize: 22, fontWeight: '900', color: '#fff' },
-  mealCardRestaurant: { fontSize: 18, fontWeight: '800', color: '#fff', marginBottom: 3 },
-  mealCardAddress:    { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginBottom: 16 },
-  progressBarTrack: {
-    height: 4, backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 2, marginBottom: 14, overflow: 'hidden',
-  },
-  progressBarFill:   { height: 4, backgroundColor: '#fff', borderRadius: 2 },
-  mealCardBottom: {
+  mealCardRestaurant: { fontSize: 19, fontWeight: '800', color: '#fff', marginBottom: 3 },
+  mealCardAddress:    { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginBottom: 20 },
+
+  // Usage section — label + count above a thicker, rounded progress track
+  usageSection: { marginBottom: 18 },
+  usageLabelRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: 8,
   },
-  mealCardUsed:      { fontSize: 13, color: 'rgba(255,255,255,0.85)' },
-  mealCardUsedCount: { fontSize: 18, fontWeight: '800', color: '#fff' },
-  viewCardBtn:       { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  viewCardText:      { fontSize: 14, fontWeight: '700', color: '#fff' },
+  usageLabel: {
+    fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.75)', letterSpacing: 0.8,
+  },
+  usageCount: { fontSize: 13, fontWeight: '800', color: '#fff' },
+  progressBarTrack: {
+    height: 7, backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 4, overflow: 'hidden',
+  },
+  progressBarFill: { height: 7, backgroundColor: '#fff', borderRadius: 4 },
+
+  // View card — proper pill button, not inline text
+  viewCardBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+    alignSelf: 'flex-start',
+    backgroundColor: '#fff', borderRadius: 20,
+    paddingHorizontal: 16, paddingVertical: 9,
+  },
+  viewCardText: { fontSize: 13, fontWeight: '700' },
 
   // ── Transactions ──
   txSectionTitle: {

@@ -1,9 +1,11 @@
 import { useState, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, StatusBar,
-  ScrollView, Alert, ActivityIndicator, Modal, TextInput,
+  View, TouchableOpacity, StyleSheet, StatusBar,
+  ScrollView, Alert, ActivityIndicator, Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Text from '../../components/Text';
+import TextInput from '../../components/TextInput';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchRedemptionById } from '../../modules/redemption/services/redemptionService';
@@ -103,6 +105,7 @@ export default function RedemptionDetailScreen() {
   const [redemption, setRedemption]         = useState<RedemptionRequest | null>(null);
   const [loading, setLoading]               = useState(true);
   const [error, setError]                   = useState<string | null>(null);
+  const [errorStatus, setErrorStatus]       = useState<number | null>(null);
   const [processing, setProcessing]         = useState(false);
   const [approveVisible, setApproveVisible] = useState(false);
   const [rejectVisible, setRejectVisible]   = useState(false);
@@ -112,11 +115,13 @@ export default function RedemptionDetailScreen() {
     if (!id) return;
     setLoading(true);
     setError(null);
+    setErrorStatus(null);
     try {
       const data = await fetchRedemptionById(id);
       setRedemption(data);
     } catch (e: any) {
-      setError(e?.message ??'Failed to load redemption');
+      setError(e?.message ?? 'Failed to load redemption');
+      setErrorStatus(e?.status ?? null);
     } finally {
       setLoading(false);
     }
@@ -191,14 +196,28 @@ export default function RedemptionDetailScreen() {
           <Text style={styles.centerText}>Loading details…</Text>
         </View>
       ) : error ? (
-        <View style={styles.centerWrap}>
-          <Ionicons name="cloud-offline-outline" size={48} color={DS.text3} />
-          <Text style={styles.errorTitle}>Could not load</Text>
-          <Text style={styles.errorDesc}>{error}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={load}>
-            <Text style={styles.retryText}>Try Again</Text>
-          </TouchableOpacity>
-        </View>
+        errorStatus === 404 ? (
+          <View style={styles.centerWrap}>
+            <Ionicons name="receipt-outline" size={48} color={DS.text3} />
+            <Text style={styles.errorTitle}>Redemption Not Found</Text>
+            <Text style={styles.errorDesc}>
+              This redemption may have already been processed or removed.{'\n'}
+              It may still be visible in a list that hasn't refreshed yet.
+            </Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => router.back()}>
+              <Text style={styles.retryText}>Back to List</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.centerWrap}>
+            <Ionicons name="cloud-offline-outline" size={48} color={DS.text3} />
+            <Text style={styles.errorTitle}>Could not load</Text>
+            <Text style={styles.errorDesc}>{error}</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={load}>
+              <Text style={styles.retryText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        )
       ) : redemption ? (
         <>
           {/* Status banner */}
@@ -219,49 +238,74 @@ export default function RedemptionDetailScreen() {
             ]}
             showsVerticalScrollIndicator={false}
           >
-            {/* Redemption Info */}
-            <Section title="REDEMPTION INFO">
-              <InfoRow label="Redemption ID"  value={`#${redemption.id}`} />
-              <InfoRow label="Subscription"   value={redemption.cardId} />
-              <InfoRow label="Status"         value={meta?.label ?? ''} valueColor={meta?.color} />
-              <InfoRow label="Requested On"   value={redemption.orderedAt} />
+            {/* Hero — the numbers a vendor needs first, at a glance */}
+            <View style={styles.heroCard}>
+              <View style={styles.heroTop}>
+                <View style={styles.heroCardBadge}>
+                  <Ionicons name="card-outline" size={13} color={DS.primary} />
+                  <Text style={styles.heroCardBadgeText} numberOfLines={1}>{redemption.cardName}</Text>
+                </View>
+                <Text style={styles.heroId}>#{redemption.id}</Text>
+              </View>
+
+              <Text style={styles.heroValueLabel}>TOTAL VALUE</Text>
+              <Text style={styles.heroValue}>₹{redemption.totalValue.toLocaleString('en-IN')}</Text>
+
+              <View style={styles.heroDivider} />
+
+              <View style={styles.heroFootRow}>
+                <View style={styles.heroFootItem}>
+                  <Ionicons name="person-circle-outline" size={16} color={DS.text2} />
+                  <Text style={styles.heroFootText} numberOfLines={1}>{redemption.customer}</Text>
+                </View>
+                <View style={styles.heroFootItem}>
+                  <Ionicons name="bag-outline" size={16} color={DS.text2} />
+                  <Text style={styles.heroFootText}>
+                    {redemption.totalUnits} item{redemption.totalUnits !== 1 ? 's' : ''}
+                  </Text>
+                </View>
+                <View style={styles.heroFootItem}>
+                  <Ionicons name="time-outline" size={16} color={DS.text2} />
+                  <Text style={styles.heroFootText}>{redemption.timeAgo}</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Items — quantity bubble + computed line total, so the math
+                behind the total value is easy to verify at a glance */}
+            <Section title="ITEMS">
+              {redemption.items.map((item, idx) => {
+                const lineTotal = item.unitPrice != null ? item.unitPrice * item.qty : undefined;
+                return (
+                  <View key={item.id}>
+                    <View style={styles.itemRow}>
+                      <View style={styles.qtyBubble}>
+                        <Text style={styles.qtyBubbleText}>{item.qty}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.itemName}>{item.name}</Text>
+                        {item.unitPrice != null && (
+                          <Text style={styles.itemUnitPrice}>₹{item.unitPrice} each</Text>
+                        )}
+                      </View>
+                      {lineTotal != null && (
+                        <Text style={styles.itemLineTotal}>₹{lineTotal.toLocaleString('en-IN')}</Text>
+                      )}
+                    </View>
+                    {idx !== redemption.items.length - 1 && <View style={styles.infoRowDivider} />}
+                  </View>
+                );
+              })}
+            </Section>
+
+            {/* Details — reference metadata, kept compact since it's not
+                what drives the approve/reject decision */}
+            <Section title="DETAILS">
+              <InfoRow label="Requested On" value={redemption.orderedAt} />
               {redemption.processedAt && (
                 <InfoRow label="Processed On" value={redemption.processedAt} />
               )}
-              <InfoRow
-                label="Initiated By"
-                value={redemption.timeAgo}
-                last={!redemption.processedAt}
-              />
-            </Section>
-
-            {/* Customer Info */}
-            <Section title="CUSTOMER">
-              <InfoRow label="Name"          value={redemption.customer} />
-              <InfoRow label="Handle"        value={redemption.customerHandle} last />
-            </Section>
-
-            {/* Items */}
-            <Section title="REQUESTED ITEMS">
-              {redemption.items.map((item, idx) => (
-                <InfoRow
-                  key={item.id}
-                  label={item.name}
-                  value={`Qty: ${item.qty}${item.unitPrice ? ` · ₹${item.unitPrice} each` : ''}`}
-                  last={idx === redemption.items.length - 1}
-                />
-              ))}
-            </Section>
-
-            {/* Summary */}
-            <Section title="SUMMARY">
-              <InfoRow label="Total Items"  value={`${redemption.totalUnits} item${redemption.totalUnits !== 1 ? 's' : ''}`} />
-              <InfoRow
-                label="Total Value"
-                value={`₹${redemption.totalValue.toLocaleString('en-IN')}`}
-                valueColor={DS.success}
-                last
-              />
+              <InfoRow label="Initiated By" value={redemption.customer} last />
             </Section>
           </ScrollView>
 
@@ -477,6 +521,46 @@ const styles = StyleSheet.create({
   // Scroll
   scroll:        { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingTop: 16 },
+
+  // Hero — total value + at-a-glance context
+  heroCard: {
+    backgroundColor: DS.primarySoft, borderRadius: 18,
+    borderWidth: 1, borderColor: '#F5C6BC',
+    padding: 18, marginBottom: 20,
+    shadowColor: DS.primary, shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1, shadowRadius: 8, elevation: 2,
+  },
+  heroTop: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 16, gap: 8,
+  },
+  heroCardBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#fff', borderRadius: 20,
+    paddingHorizontal: 10, paddingVertical: 5, flexShrink: 1,
+  },
+  heroCardBadgeText: { fontSize: 12, fontWeight: '700', color: DS.primary },
+  heroId: { fontSize: 12, color: DS.text3, fontWeight: '600', flexShrink: 0 },
+  heroValueLabel: { fontSize: 11, fontWeight: '700', color: DS.text3, letterSpacing: 1, marginBottom: 4 },
+  heroValue:      { fontSize: 34, fontWeight: '900', color: DS.text, marginBottom: 16 },
+  heroDivider:    { height: 1, backgroundColor: '#F5C6BC', marginBottom: 14 },
+  heroFootRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
+  heroFootItem: { flexDirection: 'row', alignItems: 'center', gap: 5, maxWidth: '100%' },
+  heroFootText: { fontSize: 13, color: DS.text2, fontWeight: '600' },
+
+  // Item rows — qty bubble + name + computed line total
+  itemRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 13,
+  },
+  qtyBubble: {
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: DS.bg, alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  qtyBubbleText:  { fontSize: 14, fontWeight: '800', color: DS.text2 },
+  itemName:       { fontSize: 14, fontWeight: '700', color: DS.text },
+  itemUnitPrice:  { fontSize: 12, color: DS.text3, marginTop: 2 },
+  itemLineTotal:  { fontSize: 14, fontWeight: '800', color: DS.text, flexShrink: 0 },
 
   // Sections
   section:      { marginBottom: 20 },

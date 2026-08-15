@@ -1,15 +1,17 @@
 import { useState, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, FlatList, StyleSheet,
+  View, TouchableOpacity, FlatList, StyleSheet,
   StatusBar, ScrollView, Alert, Modal, Image,
-  useWindowDimensions, RefreshControl,
+  useWindowDimensions, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Text from '../../../components/Text';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
-import { useRedemption } from '../../modules/redemption/store/RedemptionContext';
-import type { RedemptionRequest } from '../../modules/redemption/services/redemptionService';
-import { resolveMediaUrl } from '../../core/api/mediaUrl';
+import { useRedemption } from '../../../modules/redemption/store/RedemptionContext';
+import type { RedemptionRequest } from '../../../modules/redemption/services/redemptionService';
+import { resolveMediaUrl } from '../../../core/api/mediaUrl';
+import NotificationBell from '../../../modules/notifications/components/NotificationBell';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -31,6 +33,11 @@ const DS = {
   text3:       '#9BA3AF',
 };
 
+// No push/WebSocket infra exists yet for redemption requests (backend
+// endpoint isn't built), so we poll the queue at this interval as the
+// pragmatic stand-in for "vendor sees new requests without refreshing."
+const QUEUE_POLL_INTERVAL_MS = 15000;
+
 // ─── Helpers ─────────────────────────────────────────────────────────────
 
 function isSameDay(isoA: string, isoB: string): boolean {
@@ -45,6 +52,13 @@ function isSameDay(isoA: string, isoB: string): boolean {
     a.getMonth()    === b.getMonth()    &&
     a.getDate()     === b.getDate()
   );
+}
+
+// Matches the "#000068" format shown on the customer's Redemption Request
+// screen, so the vendor can read the request ID off their own screen and
+// verify it against what the customer is showing them before confirming.
+function formatRequestId(id: string): string {
+  return `#${id.padStart(6, '0')}`;
 }
 
 // ─── Skeleton ────────────────────────────────────────────────────────
@@ -78,15 +92,41 @@ function ConfirmStrikeModal({ order, visible, onClose, onConfirm }: {
   order: RedemptionRequest | null;
   visible: boolean;
   onClose: () => void;
-  onConfirm: (id: string) => void;
+  onConfirm: (id: string) => Promise<void>;
 }) {
   const { height: SH } = useWindowDimensions();
+  const [processing, setProcessing] = useState(false);
   if (!order) return null;
 
+  // Wait for the approve call to actually finish before dismissing — closing
+  // immediately (fire-and-forget) left vendors staring at a blank home screen
+  // with no feedback, which read as the button "not working" and invited
+  // repeat taps that queued up duplicate approve requests.
+  const handleConfirmPress = async () => {
+    if (processing) return;
+    setProcessing(true);
+    try {
+      await onConfirm(order.id);
+      onClose();
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={processing ? undefined : onClose}
+    >
       <View style={styles.overlay}>
-        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          onPress={processing ? undefined : onClose}
+          activeOpacity={1}
+          disabled={processing}
+        />
         <View style={[styles.sheet, { maxHeight: SH * 0.88 }]}>
           <View style={styles.handle} />
           <View style={styles.confirmIconWrap}>
@@ -128,16 +168,28 @@ function ConfirmStrikeModal({ order, visible, onClose, onConfirm }: {
           </View>
 
           <View style={styles.sheetActions}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onClose} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={[styles.cancelBtn, processing && { opacity: 0.5 }]}
+              onPress={onClose}
+              activeOpacity={0.8}
+              disabled={processing}
+            >
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.proceedBtn}
-              onPress={() => { onConfirm(order.id); onClose(); }}
+              style={[styles.proceedBtn, processing && { opacity: 0.75 }]}
+              onPress={handleConfirmPress}
               activeOpacity={0.85}
+              disabled={processing}
             >
-              <Ionicons name="checkmark-circle" size={18} color="#fff" />
-              <Text style={styles.proceedBtnText}>Yes, Confirm</Text>
+              {processing ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                  <Text style={styles.proceedBtnText}>Yes, Confirm</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -169,7 +221,7 @@ function OrderAcceptedModal({ order, visible, onClose }: {
 
           <View style={styles.summaryCard}>
             {[
-              { label: 'Subscription', value: order.cardId },
+              { label: 'Card',         value: order.cardName },
               { label: 'Customer',     value: order.customer },
               { label: 'Total Value',  value: `₹${order.totalValue}` },
               { label: 'Date',         value: order.orderedAt },
@@ -208,6 +260,14 @@ function OrderPreviewModal({ order, visible, onClose, onConfirmRequest, onReject
   const { height: SH } = useWindowDimensions();
   if (!order) return null;
 
+  const isPending = order.status === 'pending';
+  const statusMeta =
+    order.status === 'completed' ? { label: 'Confirmed', color: DS.success, bg: DS.successSoft, icon: 'checkmark-circle' as const } :
+    order.status === 'rejected'  ? { label: 'Rejected',  color: DS.error,   bg: DS.errorSoft,   icon: 'close-circle' as const } :
+    order.status === 'failed'    ? { label: 'Failed',    color: DS.error,   bg: DS.errorSoft,   icon: 'alert-circle' as const } :
+    order.status === 'reversed'  ? { label: 'Reversed',  color: DS.text3,   bg: DS.bg,          icon: 'refresh' as const } :
+    null;
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -219,8 +279,16 @@ function OrderPreviewModal({ order, visible, onClose, onConfirmRequest, onReject
           <View style={styles.previewHeader}>
             <View style={styles.previewHeaderLeft}>
               <View style={styles.subPill}>
-                <Text style={styles.subPillText}>Sub {order.cardId}</Text>
+                <Text style={styles.subPillText}>{order.cardName}</Text>
               </View>
+              {statusMeta && (
+                <View style={[styles.previewStatusChip, { backgroundColor: statusMeta.bg }]}>
+                  <Ionicons name={statusMeta.icon} size={12} color={statusMeta.color} />
+                  <Text style={[styles.previewStatusChipText, { color: statusMeta.color }]}>
+                    {statusMeta.label}
+                  </Text>
+                </View>
+              )}
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -235,12 +303,18 @@ function OrderPreviewModal({ order, visible, onClose, onConfirmRequest, onReject
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={styles.customerName}>{order.customer}</Text>
-              <Text style={styles.customerHandle}>{order.customerHandle}</Text>
             </View>
             <View style={styles.timeChip}>
               <Ionicons name="time-outline" size={11} color={DS.text3} />
               <Text style={styles.timeChipText}>{order.timeAgo}</Text>
             </View>
+          </View>
+
+          {/* Request ID — verify this against the ID on the customer's screen */}
+          <View style={styles.previewIdRow}>
+            <Ionicons name="pricetag" size={14} color={DS.primary} />
+            <Text style={styles.previewIdLabel}>REQUEST ID</Text>
+            <Text style={styles.previewIdValue}>{formatRequestId(order.id)}</Text>
           </View>
 
           <View style={styles.previewDivider} />
@@ -251,14 +325,25 @@ function OrderPreviewModal({ order, visible, onClose, onConfirmRequest, onReject
             showsVerticalScrollIndicator={false}
           >
             <Text style={styles.itemsTitle}>Order Items</Text>
-            {order.items.map(item => (
-              <View key={item.id} style={styles.itemRow}>
-                <View style={styles.qtyBubble}>
-                  <Text style={styles.qtyText}>{item.qty}</Text>
+            {order.items.map(item => {
+              const lineTotal = item.unitPrice != null ? item.unitPrice * item.qty : undefined;
+              return (
+                <View key={item.id} style={styles.itemRow}>
+                  <View style={styles.qtyBubble}>
+                    <Text style={styles.qtyText}>{item.qty}</Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+                    {item.unitPrice != null && (
+                      <Text style={styles.itemUnitPrice}>₹{item.unitPrice} each</Text>
+                    )}
+                  </View>
+                  {lineTotal != null && (
+                    <Text style={styles.itemLineTotal}>₹{lineTotal.toLocaleString('en-IN')}</Text>
+                  )}
                 </View>
-                <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
-              </View>
-            ))}
+              );
+            })}
             <View style={styles.itemSummaryBox}>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Total Items</Text>
@@ -272,7 +357,9 @@ function OrderPreviewModal({ order, visible, onClose, onConfirmRequest, onReject
             <View style={{ height: 16 }} />
           </ScrollView>
 
-          {/* Actions — only shown for pending items in the queue */}
+          {/* Actions — only shown for pending items in the queue; already-resolved
+              redemptions (confirmed/rejected/etc.) are read-only history */}
+          {isPending && (
           <View style={styles.previewActions}>
             <TouchableOpacity
               style={styles.rejectModalBtn}
@@ -297,6 +384,7 @@ function OrderPreviewModal({ order, visible, onClose, onConfirmRequest, onReject
               <Text style={styles.confirmModalText}>Confirm Strike</Text>
             </TouchableOpacity>
           </View>
+          )}
         </View>
       </View>
     </Modal>
@@ -323,8 +411,16 @@ function ActiveRedemptionCard({ order, onPreview, onConfirmRequest, onReject }: 
         </View>
       </View>
 
+      {/* Request ID — ask the customer to show this on their screen and
+          match it here before confirming the strike */}
+      <View style={styles.requestIdRow}>
+        <Ionicons name="pricetag" size={13} color={DS.primary} />
+        <Text style={styles.requestIdLabel}>REQUEST ID</Text>
+        <Text style={styles.requestIdValue}>{formatRequestId(order.id)}</Text>
+      </View>
+
       <Text style={styles.activeCustomer}>{order.customer}</Text>
-      <Text style={styles.activeCardId}>Subscription {order.cardId}</Text>
+      <Text style={styles.activeCardId}>{order.cardName}</Text>
 
       <View style={styles.activeItemsWrap}>
         {visibleItems.map(item => (
@@ -418,9 +514,15 @@ export default function HomeScreen() {
   const [successOrder, setSuccessOrder]   = useState<RedemptionRequest | null>(null);
   const [successVisible, setSuccessVisible] = useState(false);
 
-  // Reload queue + history every time this tab comes into focus
+  // Reload queue + history every time this tab comes into focus, then keep
+  // polling silently while it stays focused so a new customer redemption
+  // request shows up on its own — no manual refresh needed. Silent polls
+  // don't touch loading/error state, so they never flash a spinner or
+  // error banner over what the vendor is already looking at.
   useFocusEffect(useCallback(() => {
     loadAll();
+    const poll = setInterval(() => { loadAll(false, true); }, QUEUE_POLL_INTERVAL_MS);
+    return () => clearInterval(poll);
   }, [loadAll]));
 
   const onRefresh = useCallback(() => loadAll(true), [loadAll]);
@@ -496,9 +598,7 @@ export default function HomeScreen() {
               </View>
             )}
           </View>
-          <TouchableOpacity style={styles.iconBtn}>
-            <Ionicons name="qr-code-outline" size={20} color={DS.text} />
-          </TouchableOpacity>
+          <NotificationBell />
         </View>
 
         {/* Quick stats — both derived from backend data via context */}
@@ -606,7 +706,11 @@ export default function HomeScreen() {
               </View>
             }
             renderItem={({ item }) => (
-              <View style={styles.acceptedCard}>
+              <TouchableOpacity
+                style={styles.acceptedCard}
+                onPress={() => openPreview(item)}
+                activeOpacity={0.75}
+              >
                 <View style={styles.acceptedCardTop}>
                   <Text style={styles.acceptedCustomer} numberOfLines={1}>{item.customer}</Text>
                   <View style={styles.confirmedChip}>
@@ -618,7 +722,7 @@ export default function HomeScreen() {
                   <Text style={styles.acceptedMeta}>{item.totalUnits} items</Text>
                   <Text style={[styles.acceptedMeta, { fontWeight: '700', color: DS.text }]}>₹{item.totalValue}</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             )}
           />
         )}
@@ -679,11 +783,6 @@ const styles = StyleSheet.create({
   storeName:       { fontSize: 17, fontWeight: '800', color: DS.text },
   addressRow:      { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
   storeAddress:    { fontSize: 12, color: DS.text3, flex: 1 },
-  iconBtn: {
-    width: 36, height: 36, borderRadius: 10,
-    backgroundColor: DS.bg,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
 
   // Stats row
   statsRow:   { flexDirection: 'row', marginBottom: 14 },
@@ -726,6 +825,19 @@ const styles = StyleSheet.create({
   },
   activeCustomer: { fontSize: 20, fontWeight: '800', color: DS.text, marginBottom: 4 },
   activeCardId:   { fontSize: 12, color: DS.text3, fontWeight: '600', marginBottom: 14 },
+
+  // Request ID — verification badge
+  requestIdRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    backgroundColor: DS.primarySoft, borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 9, marginBottom: 14,
+    borderWidth: 1, borderColor: '#F5C6BC',
+  },
+  requestIdLabel: { fontSize: 11, fontWeight: '700', color: DS.primary, letterSpacing: 0.6 },
+  requestIdValue: {
+    fontSize: 15, fontWeight: '800', color: DS.primary,
+    marginLeft: 'auto', letterSpacing: 0.4,
+  },
 
   // Items in active card
   activeItemsWrap: { marginBottom: 14 },
@@ -906,13 +1018,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 5,
   },
   subPillText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  previewStatusChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, flexShrink: 0,
+  },
+  previewStatusChipText: { fontSize: 12, fontWeight: '700' },
   closeBtn: {
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: DS.bg, alignItems: 'center', justifyContent: 'center',
   },
   previewCustomerRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 20, marginBottom: 16,
+    paddingHorizontal: 20, marginBottom: 14,
   },
   customerAvatar: {
     width: 44, height: 44, borderRadius: 22,
@@ -920,8 +1037,22 @@ const styles = StyleSheet.create({
   },
   customerAvatarText: { color: '#fff', fontWeight: '800', fontSize: 18 },
   customerName:       { fontSize: 17, fontWeight: '800', color: DS.text },
-  customerHandle:     { fontSize: 13, color: DS.text3, marginTop: 2 },
-  previewDivider:     { height: 1, backgroundColor: DS.border, marginBottom: 16 },
+
+  // Request ID — verification badge (matches the ID on the customer's screen)
+  previewIdRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    backgroundColor: DS.primarySoft, borderRadius: 10,
+    marginHorizontal: 20, marginBottom: 16,
+    paddingHorizontal: 12, paddingVertical: 9,
+    borderWidth: 1, borderColor: '#F5C6BC',
+  },
+  previewIdLabel: { fontSize: 11, fontWeight: '700', color: DS.primary, letterSpacing: 0.6 },
+  previewIdValue: {
+    fontSize: 15, fontWeight: '800', color: DS.primary,
+    marginLeft: 'auto', letterSpacing: 0.4,
+  },
+
+  previewDivider: { height: 1, backgroundColor: DS.border, marginBottom: 16 },
 
   itemsScroll:   { paddingHorizontal: 20 },
   itemsTitle:    { fontSize: 16, fontWeight: '800', color: DS.text, marginBottom: 14 },
@@ -934,7 +1065,9 @@ const styles = StyleSheet.create({
     backgroundColor: DS.bg, alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   qtyText:  { fontSize: 16, fontWeight: '800', color: DS.text },
-  itemName: { fontSize: 15, fontWeight: '500', color: DS.text, flex: 1 },
+  itemName: { fontSize: 15, fontWeight: '500', color: DS.text },
+  itemUnitPrice: { fontSize: 12, color: DS.text3, marginTop: 2 },
+  itemLineTotal: { fontSize: 14, fontWeight: '800', color: DS.text, flexShrink: 0 },
 
   itemSummaryBox: {
     backgroundColor: DS.bg, borderRadius: 14,

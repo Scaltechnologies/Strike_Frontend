@@ -1,8 +1,9 @@
 import {
-  View, Text, TouchableOpacity, StyleSheet,
+  View, TouchableOpacity, StyleSheet,
   StatusBar, ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import Text from '../../components/Text';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { clearAll } from '../../core/storage/secureStorage';

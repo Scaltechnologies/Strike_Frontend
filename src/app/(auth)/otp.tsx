@@ -1,9 +1,11 @@
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  View, TouchableOpacity, StyleSheet,
   Dimensions, KeyboardAvoidingView, Platform, StatusBar,
   ActivityIndicator, SafeAreaView,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
+import Text from '../../components/Text';
+import TextInput, { type TextInputRef } from '../../components/TextInput';
 import { useState, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useVerifyOtp } from '../../modules/auth/hooks/useAuth';
@@ -28,7 +30,7 @@ export default function OtpScreen() {
   const { phoneNumber, bannerUri } = useLocalSearchParams<{ phoneNumber: string; bannerUri?: string }>();
   const { handleVerifyOtp, loading, error } = useVerifyOtp();
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
-  const inputs = useRef<(TextInput | null)[]>([]);
+  const inputs = useRef<(TextInputRef | null)[]>([]);
 
   const handleChange = (text: string, index: number) => {
     if (!/^\d*$/.test(text)) return;

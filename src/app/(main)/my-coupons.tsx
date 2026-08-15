@@ -1,9 +1,11 @@
 import { useState, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, FlatList,
-  StyleSheet, StatusBar, TextInput, RefreshControl,
+  View, TouchableOpacity, FlatList,
+  StyleSheet, StatusBar, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Text from '../../components/Text';
+import TextInput from '../../components/TextInput';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMyCoupons } from '../../modules/coupon/services/couponService';
@@ -26,21 +28,26 @@ const DS = {
   text3:       '#9BA3AF',
 };
 
-type Filter = 'all' | 'active' | 'expired' | 'inactive';
+type Filter = 'all' | 'pending' | 'active' | 'expired' | 'rejected' | 'inactive';
+type CouponState = 'pending' | 'active' | 'expired' | 'rejected' | 'inactive';
 
 function isExpired(coupon: CouponResponse) {
   return new Date(coupon.validUntil).getTime() < Date.now();
 }
 
-function couponState(coupon: CouponResponse): 'active' | 'expired' | 'inactive' {
+function couponState(coupon: CouponResponse): CouponState {
+  if (coupon.approvalStatus === 'PENDING')  return 'pending';
+  if (coupon.approvalStatus === 'REJECTED') return 'rejected';
   if (!coupon.isActive) return 'inactive';
   if (isExpired(coupon)) return 'expired';
   return 'active';
 }
 
-function stateStyle(state: 'active' | 'expired' | 'inactive') {
+function stateStyle(state: CouponState) {
   if (state === 'active')   return { bg: DS.successSoft, fg: DS.success, label: 'Active' };
+  if (state === 'pending')  return { bg: DS.warningSoft, fg: DS.warning, label: 'Pending Approval' };
   if (state === 'expired')  return { bg: DS.warningSoft, fg: DS.warning, label: 'Expired' };
+  if (state === 'rejected') return { bg: DS.errorSoft, fg: DS.error, label: 'Rejected' };
   return { bg: DS.errorSoft, fg: DS.error, label: 'Inactive' };
 }
 
@@ -119,6 +126,13 @@ function CouponCard({ item }: { item: CouponResponse }) {
           </Text>
         </View>
       </View>
+
+      {sc.label === 'Rejected' && item.rejectionReason && (
+        <View style={styles.rejectionBox}>
+          <Ionicons name="alert-circle-outline" size={13} color={DS.error} />
+          <Text style={styles.rejectionText}>{item.rejectionReason}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -164,8 +178,10 @@ export default function MyCouponsScreen() {
 
   const FILTERS: { key: Filter; label: string }[] = [
     { key: 'all',      label: 'All'      },
+    { key: 'pending',  label: 'Pending'  },
     { key: 'active',   label: 'Active'   },
     { key: 'expired',  label: 'Expired'  },
+    { key: 'rejected', label: 'Rejected' },
     { key: 'inactive', label: 'Inactive' },
   ];
 
@@ -183,6 +199,14 @@ export default function MyCouponsScreen() {
             <Text style={styles.pageTitle}>My Coupons</Text>
             <Text style={styles.pageSubtitle}>{coupons.length} total</Text>
           </View>
+          <TouchableOpacity
+            style={styles.createBtn}
+            onPress={() => router.push('/(main)/coupon-create')}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="add" size={17} color="#fff" />
+            <Text style={styles.createBtnText}>Create</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Search */}
@@ -257,8 +281,16 @@ export default function MyCouponsScreen() {
                   <Ionicons name="pricetag-outline" size={48} color={DS.text3} />
                   <Text style={styles.emptyTitle}>No coupons found</Text>
                   <Text style={styles.emptyDesc}>
-                    {search ? 'Try a different search' : 'Coupons created for you by the admin will appear here'}
+                    {search ? 'Try a different search' : 'Request a coupon and it will appear here once the admin approves it'}
                   </Text>
+                  {!search && (
+                    <TouchableOpacity
+                      style={styles.retryBtn}
+                      onPress={() => router.push('/(main)/coupon-create')}
+                    >
+                      <Text style={styles.retryText}>Request a Coupon</Text>
+                    </TouchableOpacity>
+                  )}
                 </>
               )}
             </View>
@@ -288,6 +320,13 @@ const styles = StyleSheet.create({
   headerText:   { flex: 1 },
   pageTitle:    { fontSize: 20, fontWeight: '800', color: DS.text },
   pageSubtitle: { fontSize: 13, color: DS.text3, marginTop: 2 },
+
+  createBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: DS.primary, borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 8,
+  },
+  createBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
 
   searchRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -339,6 +378,12 @@ const styles = StyleSheet.create({
   metaLabel:  { fontSize: 10, color: DS.text3, fontWeight: '500' },
   metaValue:  { fontSize: 13, fontWeight: '700', color: DS.text },
   metaDivider:{ width: 1, height: 32, backgroundColor: DS.border },
+
+  rejectionBox: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 6,
+    marginTop: 12, padding: 10, borderRadius: 10, backgroundColor: DS.errorSoft,
+  },
+  rejectionText: { flex: 1, fontSize: 12, color: DS.error, lineHeight: 16 },
 
   emptyWrap:  { alignItems: 'center', paddingTop: 60, gap: 10 },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: DS.text2 },

@@ -1,13 +1,15 @@
 import { useState, useCallback } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, FlatList,
+  View, TouchableOpacity, FlatList,
   StyleSheet, StatusBar, RefreshControl, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Text from '../../../components/Text';
+import TextInput from '../../../components/TextInput';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getMyDashboard } from '../../modules/dashboard/services/dashboardService';
-import type { DashboardSummaryResponse, ActiveCardSummary } from '../../modules/dashboard/types/dashboard.types';
+import { getMyDashboard } from '../../../modules/dashboard/services/dashboardService';
+import type { DashboardSummaryResponse, ActiveCardSummary } from '../../../modules/dashboard/types/dashboard.types';
 
 const DS = {
   bg:          '#F6F7FA',

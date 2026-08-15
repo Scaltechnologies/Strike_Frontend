@@ -1,12 +1,14 @@
 import { useState, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
+  View, TouchableOpacity, StyleSheet,
   StatusBar, FlatList, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Text from '../../components/Text';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMyCards } from '../../modules/cards/services/cardService';
+import { getCardAccent } from '../../modules/cards/cardVisuals';
 import type { CardDefinitionResponse } from '../../modules/cards/types/card.types';
 
 const DS = {
@@ -34,76 +36,80 @@ type FilterType = 'all' | 'active' | 'inactive';
 // ─── Skeleton loader ─────────────────────────────────────────────────
 function SkeletonCard() {
   return (
-    <View style={styles.card}>
-      <View style={styles.cardTop}>
-        <View style={[styles.skLine, { flex: 1, height: 18, marginRight: 12 }]} />
+    <View style={styles.skeletonCard}>
+      <View style={styles.skeletonTop}>
+        <View style={[styles.skLine, { width: 40, height: 40, borderRadius: 12 }]} />
+        <View style={[styles.skLine, { flex: 1, height: 16, marginLeft: 12 }]} />
         <View style={[styles.skLine, { width: 60, height: 22, borderRadius: 11 }]} />
       </View>
-      <View style={[styles.pricingRow]}>
-        <View style={[styles.skLine, { flex: 1, height: 52, borderRadius: 10 }]} />
-      </View>
-      <View style={styles.cardFooter}>
-        <View style={[styles.skLine, { width: 70, height: 24, borderRadius: 8 }]} />
-        <View style={[styles.skLine, { width: 90, height: 24, borderRadius: 8 }]} />
+      <View style={[styles.skLine, { height: 52, borderRadius: 10, marginTop: 14 }]} />
+      <View style={styles.skeletonFooter}>
+        <View style={[styles.skLine, { width: 70, height: 22, borderRadius: 8 }]} />
+        <View style={[styles.skLine, { width: 90, height: 22, borderRadius: 8 }]} />
       </View>
     </View>
   );
 }
 
 // ─── Card row ────────────────────────────────────────────────────────
+// Flat, single-color card fill per card (getCardAccent) — solid, no
+// gradient blend — so cards read as colorful but clean rather than busy.
 function CardRow({ card, onPress }: { card: CardDefinitionResponse; onPress: () => void }) {
   const bonus    = card.walletAmount - card.cardPrice;
   const isActive = card.isActive;
+  const accent   = getCardAccent(card.id);
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.75}>
-      {/* Name + status */}
-      <View style={styles.cardTop}>
-        <Text style={styles.cardName} numberOfLines={1} ellipsizeMode="tail">
-          {card.name}
-        </Text>
-        <View style={[styles.badge, isActive ? styles.badgeActive : styles.badgeInactive]}>
-          <View style={[styles.badgeDot, { backgroundColor: isActive ? DS.success : DS.text3 }]} />
-          <Text style={[styles.badgeText, { color: isActive ? DS.success : DS.text3 }]}>
-            {isActive ? 'Active' : 'Inactive'}
+    <TouchableOpacity style={styles.cardShadowWrap} onPress={onPress} activeOpacity={0.85}>
+      <View style={[styles.card, { backgroundColor: accent }]}>
+        {/* Name + status */}
+        <View style={styles.cardTop}>
+          <Text style={styles.cardName} numberOfLines={1} ellipsizeMode="tail">
+            {card.name}
           </Text>
+          <View style={[styles.badge, isActive ? styles.badgeActive : styles.badgeInactive]}>
+            <View style={[styles.badgeDot, { backgroundColor: isActive ? '#86EFAC' : 'rgba(255,255,255,0.55)' }]} />
+            <Text style={styles.badgeText}>
+              {isActive ? 'Active' : 'Inactive'}
+            </Text>
+          </View>
         </View>
-      </View>
 
-      {/* Pricing row */}
-      <View style={styles.pricingRow}>
-        <View style={styles.pricingBlock}>
-          <Text style={styles.pricingLabel}>PRICE</Text>
-          <Text style={styles.pricingValue}>₹{card.cardPrice}</Text>
+        {/* Pricing row */}
+        <View style={styles.pricingRow}>
+          <View style={styles.pricingBlock}>
+            <Text style={styles.pricingLabel}>PRICE</Text>
+            <Text style={styles.pricingValue}>₹{card.cardPrice}</Text>
+          </View>
+          <Ionicons name="arrow-forward" size={13} color="rgba(255,255,255,0.6)" />
+          <View style={styles.pricingBlock}>
+            <Text style={styles.pricingLabel}>WALLET</Text>
+            <Text style={[styles.pricingValue, styles.pricingValueAccent]}>₹{card.walletAmount}</Text>
+          </View>
+          {bonus > 0 && (
+            <>
+              <Ionicons name="arrow-forward" size={13} color="rgba(255,255,255,0.6)" />
+              <View style={styles.bonusPill}>
+                <Text style={styles.bonusText}>+₹{bonus} bonus</Text>
+              </View>
+            </>
+          )}
         </View>
-        <Ionicons name="arrow-forward" size={13} color={DS.text3} />
-        <View style={styles.pricingBlock}>
-          <Text style={styles.pricingLabel}>WALLET</Text>
-          <Text style={[styles.pricingValue, { color: DS.primary }]}>₹{card.walletAmount}</Text>
-        </View>
-        {bonus > 0 && (
-          <>
-            <Ionicons name="arrow-forward" size={13} color={DS.text3} />
-            <View style={styles.bonusPill}>
-              <Text style={styles.bonusText}>+₹{bonus} bonus</Text>
-            </View>
-          </>
-        )}
-      </View>
 
-      {/* Footer */}
-      <View style={styles.cardFooter}>
-        <View style={styles.footerChip}>
-          <Ionicons name="calendar-outline" size={11} color={DS.text3} />
-          <Text style={styles.footerChipText}>{card.validityInDays} days</Text>
+        {/* Footer */}
+        <View style={styles.cardFooter}>
+          <View style={styles.footerChip}>
+            <Ionicons name="calendar-outline" size={11} color="rgba(255,255,255,0.9)" />
+            <Text style={styles.footerChipText}>{card.validityInDays} days</Text>
+          </View>
+          <View style={styles.footerChip}>
+            <Ionicons name="list-outline" size={11} color="rgba(255,255,255,0.9)" />
+            <Text style={styles.footerChipText}>
+              {card.categoryIds.length} {card.categoryIds.length === 1 ? 'category' : 'categories'}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={15} color="rgba(255,255,255,0.75)" style={{ marginLeft: 'auto' }} />
         </View>
-        <View style={styles.footerChip}>
-          <Ionicons name="list-outline" size={11} color={DS.text3} />
-          <Text style={styles.footerChipText}>
-            {card.categoryIds.length} {card.categoryIds.length === 1 ? 'category' : 'categories'}
-          </Text>
-        </View>
-        <Ionicons name="chevron-forward" size={15} color={DS.text3} style={{ marginLeft: 'auto' }} />
       </View>
     </TouchableOpacity>
   );
@@ -330,48 +336,59 @@ const styles = StyleSheet.create({
   listContent: { padding: 16, paddingBottom: 32 },
   listMeta:    { fontSize: 12, color: DS.text3, marginBottom: 12, marginLeft: 2 },
 
-  // Card
-  card: {
-    backgroundColor: DS.surface, borderRadius: 16,
-    borderWidth: 1, borderColor: DS.border,
-    padding: 16, marginBottom: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+  // Card — modern neutral surface; per-card accent is a thin bar + icon
+  // chip color (getCardAccent), not a full-bleed background.
+  cardShadowWrap: {
+    borderRadius: 16, marginBottom: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12, shadowRadius: 10, elevation: 4,
   },
+  card: {
+    borderRadius: 16, padding: 18, overflow: 'hidden',
+  },
+
+  skeletonCard: {
+    backgroundColor: DS.surface, borderWidth: 1, borderColor: DS.border,
+    borderRadius: 16, padding: 16, marginBottom: 12,
+  },
+  skeletonTop:    { flexDirection: 'row', alignItems: 'center' },
+  skeletonFooter: { flexDirection: 'row', gap: 8, marginTop: 14 },
+
   cardTop: {
     flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', marginBottom: 14, gap: 10,
   },
-  cardName:  { fontSize: 17, fontWeight: '800', color: DS.text, flex: 1 },
+  cardName:  { fontSize: 17, fontWeight: '800', color: '#fff', flex: 1 },
   badge: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, flexShrink: 0,
   },
-  badgeActive:   { backgroundColor: DS.successSoft },
-  badgeInactive: { backgroundColor: DS.bg },
+  badgeActive:   { backgroundColor: 'rgba(255,255,255,0.22)' },
+  badgeInactive: { backgroundColor: 'rgba(255,255,255,0.12)' },
   badgeDot:      { width: 6, height: 6, borderRadius: 3 },
-  badgeText:     { fontSize: 12, fontWeight: '600' },
+  badgeText:     { fontSize: 12, fontWeight: '700', color: '#fff' },
 
   // Pricing row
   pricingRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: DS.bg, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 12,
     padding: 12, marginBottom: 12, gap: 8,
   },
   pricingBlock:  { alignItems: 'center' },
-  pricingLabel:  { fontSize: 9, fontWeight: '700', color: DS.text3, letterSpacing: 0.5, marginBottom: 3 },
-  pricingValue:  { fontSize: 16, fontWeight: '800', color: DS.text },
-  bonusPill:     { backgroundColor: DS.primarySoft, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  bonusText:     { fontSize: 12, fontWeight: '700', color: DS.primary },
+  pricingLabel:  { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.8)', letterSpacing: 0.5, marginBottom: 3 },
+  pricingValue:  { fontSize: 16, fontWeight: '800', color: '#fff' },
+  pricingValueAccent: { color: '#FFE9B3' },
+  bonusPill:     { backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  bonusText:     { fontSize: 12, fontWeight: '700', color: '#FFE9B3' },
 
   // Footer chips
   cardFooter:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
   footerChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: DS.bg, borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 8,
     paddingHorizontal: 8, paddingVertical: 4,
   },
-  footerChipText: { fontSize: 12, color: DS.text2, fontWeight: '500' },
+  footerChipText: { fontSize: 12, color: 'rgba(255,255,255,0.95)', fontWeight: '600' },
 
   // Empty — no cards at all
   emptyWrap: {

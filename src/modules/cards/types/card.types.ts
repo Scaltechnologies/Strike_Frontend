@@ -99,10 +99,15 @@ export interface MenuItemPreview {
 export interface SubscriptionResponse {
   id: number;
   userId: number;
+  customerName?: string | null;
   cardDefinitionId: number;
   cardName: string;
   storeId: number;
   walletBalance: number;
+  couponCode: string | null;
+  originalAmount: number;
+  discountApplied: number;
+  finalAmount: number;
   status: SubscriptionStatus;
   purchasedAt: string;
   expiresAt: string;

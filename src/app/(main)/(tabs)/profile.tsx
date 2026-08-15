@@ -1,23 +1,26 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
+  View, TouchableOpacity, StyleSheet,
   StatusBar, ScrollView, Alert, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Text from '../../../components/Text';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { clearAll } from '../../core/storage/secureStorage';
+import { clearAll } from '../../../core/storage/secureStorage';
+import { deregisterCurrentPushToken } from '../../../modules/notifications/push/pushRegistration';
+import { resetNotificationStore } from '../../../modules/notifications/store/notificationStore';
 import {
   getVendorProfile,
   getVendorProfileStatus,
-} from '../../modules/vendor/services/vendorProfileService';
-import { getMyCards } from '../../modules/cards/services/cardService';
-import { getMyStore } from '../../modules/store/services/storeService';
+} from '../../../modules/vendor/services/vendorProfileService';
+import { getMyCards } from '../../../modules/cards/services/cardService';
+import { getMyStore } from '../../../modules/store/services/storeService';
 import type {
   VendorProfileResponse,
   VendorProfileStatus,
-} from '../../modules/vendor/types/vendor.types';
-import type { StoreStatus } from '../../modules/store/types/store.types';
+} from '../../../modules/vendor/types/vendor.types';
+import type { StoreStatus } from '../../../modules/store/types/store.types';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -133,6 +136,8 @@ export default function ProfileScreen() {
         text: 'Logout',
         style: 'destructive',
         onPress: async () => {
+          try { await deregisterCurrentPushToken(); } catch { /* best-effort, never blocks logout */ }
+          resetNotificationStore();
           await clearAll();
           router.replace('/(auth)/welcome');
         },

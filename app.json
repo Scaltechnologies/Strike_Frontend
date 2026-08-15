@@ -37,6 +37,13 @@
         {
           "photosPermission": "Strike needs access to your photos so you can set a banner image for your store."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#CC2200",
+          "defaultChannel": "default"
+        }
       ]
     ],
     "extra": {

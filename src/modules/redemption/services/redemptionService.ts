@@ -21,6 +21,7 @@ interface RedemptionItemBackend {
 interface RedemptionBackend {
   id: number;
   subscriptionId: number;
+  cardName: string | null;
   userId: number;
   customerName: string;
   storeId: number;
@@ -55,10 +56,9 @@ export type RedemptionStatus =
 
 export interface RedemptionRequest {
   id: string;
-  cardId: string;
+  cardName: string;
   subscriptionId: number;
   customer: string;
-  customerHandle: string;
   phone: string;
   cardType: string;
   timeAgo: string;
@@ -110,14 +110,12 @@ function mapStatus(s: string): RedemptionStatus {
 function mapToRedemptionRequest(r: RedemptionBackend): RedemptionRequest {
   const safeItems = r.items ?? [];
   const totalUnits = safeItems.reduce((sum, item) => sum + (item.quantity ?? 0), 0);
-  const handle = '@' + (r.customerName ?? '').toLowerCase().replace(/\s+/g, '_');
 
   return {
     id:              String(r.id),
-    cardId:          '#' + r.subscriptionId,
+    cardName:        r.cardName ?? 'Card',
     subscriptionId:  r.subscriptionId,
     customer:        r.customerName ?? '',
-    customerHandle:  handle,
     phone:           '',
     cardType:        'Card',
     timeAgo:         formatTimeAgo(r.createdAt),

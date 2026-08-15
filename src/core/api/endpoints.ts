@@ -90,6 +90,22 @@ const endpoints = {
   // CouponController → /api/vendor/coupons (auth required, VENDOR role)
   coupon: {
     my: '/api/vendor/coupons/my',
+    // POST /api/vendor/coupons — vendor submits a coupon request; returned with
+    // approvalStatus: 'PENDING', isActive: false. Admin approves/rejects via
+    // admin-service (PATCH /api/admin/coupons/{id}/approve|reject).
+    create: '/api/vendor/coupons',
+  },
+
+  // ── Notifications ─────────────────────────────────────────────────
+  // VendorNotificationController → /api/vendor/notifications (auth required, VENDOR role)
+  // NOT YET IMPLEMENTED BACKEND-SIDE — this is the proposed contract; see notifications plan.
+  notification: {
+    list:                '/api/vendor/notifications',              // GET, paginated: ?page=&size=&unreadOnly=
+    unreadCount:         '/api/vendor/notifications/unread-count',  // GET
+    markRead:            (id: number | string) => `/api/vendor/notifications/${id}/read`, // PATCH
+    markAllRead:         '/api/vendor/notifications/read-all',      // PATCH
+    registerPushToken:   '/api/vendor/notifications/push-token',    // POST
+    deregisterPushToken: '/api/vendor/notifications/push-token',    // DELETE
   },
 
   // ── Withdrawals / Wallet ──────────────────────────────────────────────
@@ -97,8 +113,10 @@ const endpoints = {
   // Thin proxy to admin-service (RestTemplate passthrough) — responses are raw JSON,
   // NOT wrapped in the usual ApiResponse<T> envelope.
   withdrawal: {
-    my:    '/api/vendor/withdrawals',
-    stats: '/api/vendor/withdrawals/stats',
+    my:          '/api/vendor/withdrawals',
+    stats:       '/api/vendor/withdrawals/stats',
+    commissions: '/api/vendor/withdrawals/commissions',
+    payoutMethod: '/api/vendor/withdrawals/payout-method',
   },
 
 } as const;

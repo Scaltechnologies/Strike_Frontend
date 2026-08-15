@@ -51,3 +51,47 @@ export interface CreateWithdrawalRequest {
   upiId?: string;             // required when method === 'UPI'
   note?: string;
 }
+
+// GET /api/vendor/withdrawals/commissions → raw PageResponse (NOT ApiResponse-wrapped)
+// One row per card purchase: the gross amount, the platform's cut, and what was credited.
+// REVERSED means a cancelled/duplicate purchase — excluded from totalEarnings/availableBalance
+// server-side, so it must never render as "Credited" here either.
+export type CommissionStatus = 'PENDING' | 'SETTLED' | 'REVERSED';
+
+export interface CommissionRecordResponse {
+  id: number;
+  vendorId: number;
+  vendorName: string;
+  storeId: number;
+  subscriptionId: number;
+  cardName: string | null; // null for records created before this field existed
+  userId: number;
+  subscriptionAmount: number; // gross card price paid by the customer
+  commissionRate: number;     // % taken by the platform at the time of purchase
+  commissionAmount: number;   // subscriptionAmount * commissionRate / 100
+  status: CommissionStatus;
+  settledAt: string | null;
+  createdAt: string;
+}
+
+export interface CommissionPage {
+  content: CommissionRecordResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
+}
+
+// GET /api/vendor/withdrawals/payout-method → raw object, or null if the vendor has
+// never submitted a withdrawal yet. Remembered from their most recently used details
+// so the request form can be pre-filled instead of retyped every time.
+export interface SavedPayoutMethod {
+  vendorId: number;
+  method: PayoutMethod;
+  bankAccountNumber: string | null;
+  bankAccountName: string | null;
+  ifscCode: string | null;
+  upiId: string | null;
+  updatedAt: string;
+}

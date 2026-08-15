@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  View, TouchableOpacity, StyleSheet,
   StatusBar, ScrollView, Alert, ActivityIndicator,
   KeyboardAvoidingView, Platform, Modal,
 } from 'react-native';
+import Text from '../../components/Text';
+import TextInput from '../../components/TextInput';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, withDelay, withSpring, Easing,
 } from 'react-native-reanimated';
@@ -13,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createCard } from '../../modules/cards/services/cardService';
 import { getMyStore } from '../../modules/store/services/storeService';
 import { fetchCategories, fetchMenuItems } from '../../modules/menu/services/menuService';
+import VegNonVegBadge from '../../modules/menu/components/VegNonVegBadge';
 import type { CreateCardRequest } from '../../modules/cards/types/card.types';
 import type { CategoryResponse, MenuItemResponse } from '../../modules/menu/services/menuService';
 
@@ -650,11 +653,8 @@ export default function CardCreateScreen() {
                         <Text style={ss.itemName} numberOfLines={1}>{item.name}</Text>
                         <View style={ss.itemMeta}>
                           <Text style={ss.itemPrice}>₹{item.price}</Text>
-                          {item.itemType === 'VEG' && (
-                            <Text style={[ss.itemTag, { color: DS.success }]}>Veg</Text>
-                          )}
-                          {item.itemType === 'NON_VEG' && (
-                            <Text style={[ss.itemTag, { color: DS.primary }]}>Non-Veg</Text>
+                          {item.itemType && (
+                            <VegNonVegBadge type={item.itemType} size={13} showLabel />
                           )}
                           {item.availabilityStatus === 'OUT_OF_STOCK' && (
                             <Text style={[ss.itemTag, { color: DS.warning }]}>OOS</Text>

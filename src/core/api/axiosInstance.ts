@@ -9,8 +9,21 @@ import {
   clearAll,
 } from '../storage/secureStorage';
 import { setMaintenance } from '../maintenance/maintenanceStore';
+import { resetNotificationStore } from '../../modules/notifications/store/notificationStore';
 
-export const BASE_URL = 'http://192.168.88.93:8080';
+// Backed by EXPO_PUBLIC_API_URL (see .env) — Expo inlines EXPO_PUBLIC_* vars into
+// the JS bundle at build time. Override per-machine via a gitignored .env.local,
+// and set per-environment values (staging/production) in EAS build profile env
+// vars before shipping, rather than editing this fallback.
+const FALLBACK_BASE_URL = 'http://192.168.88.12:8080';
+export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || FALLBACK_BASE_URL;
+
+if (__DEV__ && !process.env.EXPO_PUBLIC_API_URL) {
+  console.warn(
+    `[axiosInstance] EXPO_PUBLIC_API_URL is not set — falling back to ${FALLBACK_BASE_URL}. ` +
+    'Set it in .env or a gitignored .env.local.',
+  );
+}
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
@@ -96,6 +109,7 @@ axiosInstance.interceptors.response.use(
       } catch {
         // Refresh failed — clear session and send user to login
         refreshQueue = [];
+        resetNotificationStore();
         await clearAll();
         router.replace('/(auth)/login');
         return Promise.reject(new Error('Session expired. Please log in again.'));

@@ -1,9 +1,11 @@
 import { useState, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, TextInput, ScrollView, Modal,
+  View, TouchableOpacity, ScrollView, Modal,
   StyleSheet, StatusBar, Alert, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Text from '../../components/Text';
+import TextInput from '../../components/TextInput';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useRedemption } from '../../modules/redemption/store/RedemptionContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

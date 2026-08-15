@@ -1,9 +1,11 @@
 import { useState, useCallback } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, FlatList, Modal,
-  ScrollView, StyleSheet, StatusBar, RefreshControl, Alert,
+  View, TouchableOpacity, FlatList, Modal,
+  StyleSheet, StatusBar, RefreshControl, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Text from '../../components/Text';
+import TextInput from '../../components/TextInput';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRedemption } from '../../modules/redemption/store/RedemptionContext';
@@ -36,6 +38,10 @@ const DARK = {
   text2: '#D4B896',
   text3: '#9B7E5E',
 };
+
+// No push/WebSocket infra exists yet for redemption requests, so we poll
+// at this interval as the pragmatic stand-in for live updates.
+const QUEUE_POLL_INTERVAL_MS = 15000;
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 type FilterKey = 'all' | 'pending' | 'completed' | 'rejected';
@@ -116,7 +122,7 @@ function RedemptionCard({ item, onApprove, onReject }: {
         </View>
         <View style={styles.cardBody}>
           <Text style={styles.cardCustomer} numberOfLines={1}>{item.customer}</Text>
-          <Text style={styles.cardSub}>Sub {item.cardId} · {item.timeAgo}</Text>
+          <Text style={styles.cardSub}>{item.cardName} · {item.timeAgo}</Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: meta.bg }]}>
           <View style={[styles.statusDot, { backgroundColor: meta.color }]} />
@@ -311,9 +317,14 @@ export default function RedemptionHistoryScreen() {
   const [approveItem, setApproveItem] = useState<RedemptionRequest | null>(null);
   const [rejectItem, setRejectItem]   = useState<RedemptionRequest | null>(null);
 
-  // Reload history every time this screen comes into focus
+  // Reload history every time this screen comes into focus, then keep
+  // polling silently while it stays focused so new/updated redemption
+  // requests show up without a manual refresh (no push/WebSocket backend
+  // exists yet, so polling is the pragmatic stand-in).
   useFocusEffect(useCallback(() => {
     loadHistory();
+    const poll = setInterval(() => { loadHistory(false, true); }, QUEUE_POLL_INTERVAL_MS);
+    return () => clearInterval(poll);
   }, [loadHistory]));
 
   const handleApprove = async () => {
@@ -354,7 +365,7 @@ export default function RedemptionHistoryScreen() {
     return (
       r.customer.toLowerCase().includes(q) ||
       r.id.includes(q) ||
-      r.cardId.toLowerCase().includes(q) ||
+      r.cardName.toLowerCase().includes(q) ||
       r.items.some(it => it.name.toLowerCase().includes(q))
     );
   });
@@ -395,11 +406,14 @@ export default function RedemptionHistoryScreen() {
         {/* Stats — derived from backend data */}
         <View style={styles.statsRow}>
           {[
-            { label: 'PENDING',  value: pendingCount,   color: DS.warning },
-            { label: 'APPROVED', value: completedCount, color: DS.success },
-            { label: 'REJECTED', value: rejectedCount,  color: DS.error   },
+            { label: 'PENDING',  value: pendingCount,   color: DS.warning, bg: 'rgba(217,119,6,0.14)',  icon: 'time-outline' as const },
+            { label: 'APPROVED', value: completedCount, color: DS.success, bg: 'rgba(22,163,74,0.14)',  icon: 'checkmark-circle-outline' as const },
+            { label: 'REJECTED', value: rejectedCount,  color: DS.error,   bg: 'rgba(220,38,38,0.14)',  icon: 'close-circle-outline' as const },
           ].map(s => (
             <View key={s.label} style={styles.statChip}>
+              <View style={[styles.statIconWrap, { backgroundColor: s.bg }]}>
+                <Ionicons name={s.icon} size={14} color={s.color} />
+              </View>
               <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
               <Text style={styles.statLabel}>{s.label}</Text>
             </View>
@@ -427,12 +441,7 @@ export default function RedemptionHistoryScreen() {
         </View>
 
         {/* Filter tabs */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterScroll}
-          contentContainerStyle={styles.filterContent}
-        >
+        <View style={styles.filterRow}>
           {FILTERS.map(f => (
             <TouchableOpacity
               key={f.key}
@@ -450,7 +459,7 @@ export default function RedemptionHistoryScreen() {
               </View>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
 
         {/* List */}
         <FlatList
@@ -566,9 +575,13 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row', gap: 10 },
   statChip: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderRadius: 14, paddingVertical: 12, alignItems: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 16, paddingVertical: 14, alignItems: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)',
+  },
+  statIconWrap: {
+    width: 26, height: 26, borderRadius: 13,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 8,
   },
   statValue: { fontSize: 22, fontWeight: '800', marginBottom: 3 },
   statLabel: { fontSize: 9, fontWeight: '700', color: DARK.text3, letterSpacing: 0.8 },
@@ -587,18 +600,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: DS.bg, borderRadius: 12,
     borderWidth: 1, borderColor: DS.border,
-    paddingHorizontal: 12, paddingVertical: 11,
-    marginHorizontal: 16, marginBottom: 12,
+    paddingHorizontal: 14, paddingVertical: 12,
+    marginHorizontal: 20, marginBottom: 14,
   },
   searchInput: { flex: 1, fontSize: 14, color: DS.text, padding: 0 },
 
   // Filter tabs
-  filterScroll:  { maxHeight: 50, marginBottom: 12 },
-  filterContent: { paddingHorizontal: 16, gap: 8, alignItems: 'center' },
+  filterRow: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    paddingHorizontal: 20, gap: 8, marginBottom: 16,
+  },
   filterChip: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     borderWidth: 1.5, borderColor: DS.border, borderRadius: 20,
-    paddingHorizontal: 12, paddingVertical: 7,
+    paddingHorizontal: 12, paddingVertical: 8,
   },
   filterChipActive:   { backgroundColor: DS.primary, borderColor: DS.primary },
   filterText:         { fontSize: 13, fontWeight: '600', color: DS.text2 },
@@ -617,14 +632,14 @@ const styles = StyleSheet.create({
   filterCountTextActive: { color: '#fff' },
 
   // List
-  listContent: { paddingHorizontal: 16, paddingTop: 4, flexGrow: 1 },
+  listContent: { paddingHorizontal: 20, paddingTop: 4, flexGrow: 1 },
 
   // Card
   card: {
-    backgroundColor: DS.surface, borderRadius: 16, padding: 16,
-    marginBottom: 10, borderWidth: 1, borderColor: DS.border,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+    backgroundColor: DS.surface, borderRadius: 18, padding: 16,
+    marginBottom: 12, borderWidth: 1, borderColor: DS.border,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
   },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
   cardAvatar: {
