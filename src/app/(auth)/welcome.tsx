@@ -1,12 +1,12 @@
 import {
   View,
-  Text,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
   Image,
 } from 'react-native';
 import { router } from 'expo-router';
+import Text from '../../components/Text';
 
 
 const { width, height } = Dimensions.get('window');

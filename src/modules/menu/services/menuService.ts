@@ -1,5 +1,7 @@
-import axiosInstance from '../../../core/api/axiosInstance';
+import axiosInstance, { BASE_URL } from '../../../core/api/axiosInstance';
 import endpoints from '../../../core/api/endpoints';
+import { getAccessToken } from '../../../core/storage/secureStorage';
+import { uploadFile } from '../../../core/api/fileUpload';
 import type { ApiResponse } from '../../../core/types/api.types';
 
 export interface CategoryResponse {
@@ -70,6 +72,37 @@ export async function updateCategory(
 
 export async function deleteCategory(id: number): Promise<void> {
   await axiosInstance.delete(endpoints.menu.category(id));
+}
+
+// POST /api/menu/categories/{id}/image — multipart upload, field name "file".
+// Uses expo-file-system's native uploadAsync — see fileUpload.ts for why
+// fetch()+FormData()+Blob doesn't work in this app's RN environment.
+export async function uploadCategoryImage(
+  categoryId: number,
+  localUri: string,
+): Promise<CategoryResponse> {
+  const token = await getAccessToken();
+  const url = `${BASE_URL}${endpoints.menu.categoryImage(categoryId)}`;
+
+  const res = await uploadFile(url, localUri, 'file', token);
+
+  const body: ApiResponse<CategoryResponse> | null = (() => {
+    try { return JSON.parse(res.body); } catch { return null; }
+  })();
+
+  if (res.status === 413) {
+    throw new Error('That photo is too large for the server to accept — please pick a different one.');
+  }
+  if (res.status < 200 || res.status >= 300) {
+    const message = body?.message || `HTTP ${res.status}`;
+    const apiError = new Error(`[${res.status}] ${endpoints.menu.categoryImage(categoryId)} — ${message}`) as Error & { status?: number };
+    apiError.status = res.status;
+    throw apiError;
+  }
+  if (!body) {
+    throw new Error('Malformed response from server.');
+  }
+  return body.data;
 }
 
 // ── Menu Items ──────────────────────────────────────────────────────

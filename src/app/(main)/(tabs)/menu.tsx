@@ -1,17 +1,25 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet,
+  View, TouchableOpacity, FlatList, StyleSheet,
   StatusBar, Switch, Image, Alert, Modal, ScrollView, Animated,
-  Platform, Keyboard, KeyboardAvoidingView, Share, useWindowDimensions,
+  Platform, Keyboard, KeyboardAvoidingView, Share, RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import Text from '../../../components/Text';
+import TextInput from '../../../components/TextInput';
 import { Ionicons } from '@expo/vector-icons';
 import {
   useMenu,
   CategoryResponse,
   MenuItemResponse,
   CreateMenuItemRequest,
-} from '../../modules/menu/hooks/useMenu';
+} from '../../../modules/menu/hooks/useMenu';
+import CategoryImagePicker from '../../../modules/menu/components/CategoryImagePicker';
+import { resolveMediaUrl } from '../../../core/api/mediaUrl';
+import { SkeletonBlock } from '../../../components/Skeleton';
+import FadeIn from '../../../components/FadeIn';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -69,10 +77,11 @@ function useToast() {
 function SkeletonRow() {
   return (
     <View style={styles.skeletonRow}>
-      <View style={styles.skeletonThumb} />
+      <SkeletonBlock w={52} h={52} radius={8} color={DS.bg} />
       <View style={styles.skeletonBody}>
-        <View style={styles.skeletonLine} />
-        <View style={[styles.skeletonLine, { width: '45%', marginTop: 7 }]} />
+        <SkeletonBlock w="70%" h={13} radius={6} color={DS.bg} />
+        <View style={{ height: 7 }} />
+        <SkeletonBlock w="45%" h={13} radius={6} color={DS.bg} />
       </View>
     </View>
   );
@@ -83,17 +92,25 @@ function SkeletonRow() {
 interface CatFormProps {
   visible: boolean;
   initial?: CategoryResponse | null;
-  onSave: (name: string) => void;
+  onSave: (name: string, imageUri?: string) => void;
   onClose: () => void;
   saving: boolean;
 }
 
 function CategoryFormModal({ visible, initial, onSave, onClose, saving }: CatFormProps) {
-  const [name, setName] = useState('');
+  const [name, setName]         = useState('');
+  const [pickedUri, setPicked]  = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    if (visible) setName(initial?.name ?? '');
+    if (visible) {
+      setName(initial?.name ?? '');
+      setPicked(undefined);
+    }
   }, [visible, initial]);
+
+  // A freshly-picked local photo takes priority over whatever the category
+  // already has saved on the server.
+  const previewUri = pickedUri ?? resolveMediaUrl(initial?.imageUrl) ?? null;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -118,14 +135,32 @@ function CategoryFormModal({ visible, initial, onSave, onClose, saving }: CatFor
         style={styles.kavContainer}
       >
         <View style={styles.catFormSheet}>
-          <Text style={styles.catFormTitle}>
-            {initial ? 'Rename Category' : 'New Category'}
+          <View style={styles.catFormHeader}>
+            <Text style={styles.catFormTitle}>
+              {initial ? 'Edit Category' : 'New Category'}
+            </Text>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="close" size={18} color={DS.text2} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.catFormSubtitle}>
+            Give it a name and a photo — this is how customers will spot it while browsing.
           </Text>
+
+          <View style={styles.catFormImageRow}>
+            <CategoryImagePicker uri={previewUri} onPick={setPicked} />
+          </View>
+
+          <Text style={styles.fieldLabel}>Category Name *</Text>
           <TextInput
             style={styles.catFormInput}
             value={name}
             onChangeText={setName}
-            placeholder="Category name"
+            placeholder="e.g. Starters, Beverages, Desserts"
             placeholderTextColor={DS.text3}
             autoFocus
             maxLength={60}
@@ -136,7 +171,7 @@ function CategoryFormModal({ visible, initial, onSave, onClose, saving }: CatFor
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.saveBtn, (!name.trim() || saving) && { opacity: 0.45 }]}
-              onPress={() => name.trim() && onSave(name.trim())}
+              onPress={() => name.trim() && onSave(name.trim(), pickedUri)}
               disabled={!name.trim() || saving}
             >
               <Text style={styles.saveBtnText}>{saving ? 'Saving…' : 'Save'}</Text>
@@ -252,17 +287,27 @@ function ItemFormModal({ visible, initial, categories, onSave, onClose }: ItemFo
               keyboardShouldPersistTaps="handled"
             >
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                {categories.map(cat => (
-                  <TouchableOpacity
-                    key={cat.id}
-                    onPress={() => setCatId(cat.id)}
-                    style={[styles.catPill, categoryId === cat.id && styles.catPillActive]}
-                  >
-                    <Text style={[styles.catPillText, categoryId === cat.id && styles.catPillTextActive]}>
-                      {cat.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {categories.map(cat => {
+                  const thumb = resolveMediaUrl(cat.imageUrl);
+                  return (
+                    <TouchableOpacity
+                      key={cat.id}
+                      onPress={() => setCatId(cat.id)}
+                      style={[styles.catPill, categoryId === cat.id && styles.catPillActive]}
+                    >
+                      {thumb ? (
+                        <Image source={{ uri: thumb }} style={styles.catChipThumb} />
+                      ) : (
+                        <View style={[styles.catChipThumb, styles.catChipThumbPlaceholder]}>
+                          <Text style={styles.catChipThumbInitial}>{cat.name.charAt(0).toUpperCase()}</Text>
+                        </View>
+                      )}
+                      <Text style={[styles.catPillText, categoryId === cat.id && styles.catPillTextActive]}>
+                        {cat.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </ScrollView>
 
@@ -373,7 +418,6 @@ function DetailSheet({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const { width: SW } = useWindowDimensions();
   if (!item) return null;
 
   const catName = categories.find(c => c.id === item.categoryId)?.name ?? 'Uncategorized';
@@ -387,47 +431,61 @@ function DetailSheet({
         activeOpacity={1}
       />
       <View style={styles.detailSheet}>
-        <View style={styles.sheetHandle} />
+        <LinearGradient
+          colors={[DS.primary, DS.primaryDark]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.detailHeader}
+        >
+          <View style={styles.sheetHandleLight} />
 
-        {item.imageUrl ? (
-          <Image
-            source={{ uri: item.imageUrl }}
-            style={[styles.detailImg, { width: SW - 32 }]}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[styles.detailImg, styles.detailImgPlaceholder, { width: SW - 32 }]}>
-            <Ionicons name="restaurant-outline" size={40} color={DS.text3} />
+          <TouchableOpacity
+            style={styles.detailCloseBtn}
+            onPress={onClose}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="close" size={18} color="#fff" />
+          </TouchableOpacity>
+
+          <View style={styles.detailEyebrowRow}>
+            {item.itemType && (
+              <View style={styles.detailTypeChip}>
+                <View style={[
+                  styles.typeIndicator,
+                  { backgroundColor: item.itemType === 'VEG' ? '#4ADE80' : '#FF8A80' },
+                ]} />
+                <Text style={styles.detailTypeChipText}>
+                  {item.itemType === 'VEG' ? 'Veg' : 'Non-Veg'}
+                </Text>
+              </View>
+            )}
+            <Text style={styles.detailEyebrow} numberOfLines={1}>{catName}</Text>
           </View>
-        )}
+
+          <Text style={styles.detailHeaderName} numberOfLines={2}>{item.name}</Text>
+
+          <View style={styles.detailHeaderBottomRow}>
+            <Text style={styles.detailPriceBig}>₹{item.price}</Text>
+            <View style={[
+              styles.headerStatusChip,
+              { backgroundColor: isAvail ? 'rgba(74,222,128,0.2)' : 'rgba(255,138,128,0.2)' },
+            ]}>
+              <View style={[styles.statusDot, { backgroundColor: isAvail ? '#4ADE80' : '#FF8A80' }]} />
+              <Text style={[styles.headerStatusText, { color: isAvail ? '#4ADE80' : '#FF8A80' }]}>
+                {isAvail ? 'Available' : 'Out of stock'}
+              </Text>
+            </View>
+          </View>
+        </LinearGradient>
 
         <View style={styles.detailBody}>
-          <View style={styles.detailTopRow}>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                {item.itemType && (
-                  <View style={[
-                    styles.typeIndicator,
-                    { backgroundColor: item.itemType === 'VEG' ? DS.success : DS.error },
-                  ]} />
-                )}
-                <Text style={styles.detailName} numberOfLines={2}>{item.name}</Text>
-              </View>
-              <Text style={styles.detailCat}>{catName}</Text>
+          {!!item.description && (
+            <View style={styles.detailDescCard}>
+              <Text style={styles.detailDesc}>{item.description}</Text>
             </View>
-            <Text style={styles.detailPrice}>₹{item.price}</Text>
-          </View>
+          )}
 
-          <View style={[styles.statusChip, { backgroundColor: isAvail ? DS.successSoft : DS.errorSoft }]}>
-            <View style={[styles.statusDot, { backgroundColor: isAvail ? DS.success : DS.error }]} />
-            <Text style={[styles.statusText, { color: isAvail ? DS.success : DS.error }]}>
-              {isAvail ? 'Available' : 'Out of stock'}
-            </Text>
-          </View>
-
-          {!!item.description && <Text style={styles.detailDesc}>{item.description}</Text>}
-
-          <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
+          <TouchableOpacity style={styles.editBtn} onPress={onEdit} activeOpacity={0.85}>
             <Ionicons name="create-outline" size={16} color="#fff" />
             <Text style={styles.editBtnText}>Edit Item</Text>
           </TouchableOpacity>
@@ -436,13 +494,15 @@ function DetailSheet({
             <TouchableOpacity
               style={styles.secondaryBtn}
               onPress={() => Share.share({ message: `${item.name} – ₹${item.price}` })}
+              activeOpacity={0.75}
             >
               <Ionicons name="share-outline" size={15} color={DS.text2} />
               <Text style={styles.secondaryBtnText}>Share</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.secondaryBtn, { borderColor: DS.errorSoft, backgroundColor: DS.errorSoft }]}
+              style={[styles.secondaryBtn, styles.secondaryBtnDanger]}
               onPress={onDelete}
+              activeOpacity={0.75}
             >
               <Ionicons name="trash-outline" size={15} color={DS.error} />
               <Text style={[styles.secondaryBtnText, { color: DS.error }]}>Delete</Text>
@@ -522,10 +582,12 @@ const AVAIL_FILTERS: { key: AvailFilter; label: string }[] = [
 export default function MenuScreen() {
   const insets = useSafeAreaInsets();
   const {
-    categories, items, loading,
+    categories, items, loading, refreshing, refresh,
     addCategory, editCategory, removeCategory,
     toggleAvailability, addItem, editItem, removeItem,
   } = useMenu();
+
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
   const [search, setSearch]            = useState('');
   const [availFilter, setAvailFilter]  = useState<AvailFilter>('all');
@@ -562,14 +624,14 @@ export default function MenuScreen() {
 
   // ── Category handlers ─────────────────────────────────────────────
 
-  const handleSaveCat = useCallback(async (name: string) => {
+  const handleSaveCat = useCallback(async (name: string, imageUri?: string) => {
     setCatSaving(true);
     try {
       if (editingCat) {
-        await editCategory(editingCat.id, name);
-        showToast('Category renamed', 'ok');
+        await editCategory(editingCat.id, name, imageUri);
+        showToast('Category updated', 'ok');
       } else {
-        await addCategory(name);
+        await addCategory(name, imageUri);
         showToast('Category added', 'ok');
       }
       setCatForm(false);
@@ -583,7 +645,7 @@ export default function MenuScreen() {
 
   const handleCatLongPress = useCallback((cat: CategoryResponse) => {
     Alert.alert(cat.name, undefined, [
-      { text: 'Rename', onPress: () => { setEditingCat(cat); setCatForm(true); } },
+      { text: 'Edit', onPress: () => { setEditingCat(cat); setCatForm(true); } },
       {
         text: 'Delete', style: 'destructive',
         onPress: () => Alert.alert(
@@ -697,18 +759,28 @@ export default function MenuScreen() {
             </Text>
           </TouchableOpacity>
 
-          {categories.map(cat => (
-            <TouchableOpacity
-              key={cat.id}
-              onPress={() => setSelCatId(prev => (prev === cat.id ? null : cat.id))}
-              onLongPress={() => handleCatLongPress(cat)}
-              style={[styles.catChip, selectedCatId === cat.id && styles.catChipActive]}
-            >
-              <Text style={[styles.catChipText, selectedCatId === cat.id && styles.catChipTextActive]}>
-                {cat.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {categories.map(cat => {
+            const thumb = resolveMediaUrl(cat.imageUrl);
+            return (
+              <TouchableOpacity
+                key={cat.id}
+                onPress={() => setSelCatId(prev => (prev === cat.id ? null : cat.id))}
+                onLongPress={() => handleCatLongPress(cat)}
+                style={[styles.catChip, selectedCatId === cat.id && styles.catChipActive]}
+              >
+                {thumb ? (
+                  <Image source={{ uri: thumb }} style={styles.catChipThumb} />
+                ) : (
+                  <View style={[styles.catChipThumb, styles.catChipThumbPlaceholder]}>
+                    <Text style={styles.catChipThumbInitial}>{cat.name.charAt(0).toUpperCase()}</Text>
+                  </View>
+                )}
+                <Text style={[styles.catChipText, selectedCatId === cat.id && styles.catChipTextActive]}>
+                  {cat.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
 
           <TouchableOpacity
             style={styles.catAddBtn}
@@ -777,32 +849,42 @@ export default function MenuScreen() {
             {[1, 2, 3, 4].map(k => <SkeletonRow key={k} />)}
           </ScrollView>
         ) : (
-          <FlatList
-            data={filtered}
-            keyExtractor={i => String(i.id)}
-            renderItem={({ item }) => (
-              <MenuRow
-                item={item}
-                categories={categories}
-                onToggle={() => handleToggle(item)}
-                onPress={() => setDetailItem(item)}
-              />
-            )}
-            ListEmptyComponent={
-              <View style={styles.empty}>
-                <Ionicons name="restaurant-outline" size={44} color={DS.border} />
-                <Text style={styles.emptyTitle}>
-                  {items.length === 0 ? 'No Menu Items Yet' : 'No items match filters'}
-                </Text>
-                {items.length === 0 && (
-                  <Text style={styles.emptyHint}>Tap + to add your first item.</Text>
-                )}
-              </View>
-            }
-            contentContainerStyle={[styles.listContent, { flexGrow: 1 }]}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          />
+          <FadeIn style={{ flex: 1 }}>
+            <FlatList
+              data={filtered}
+              keyExtractor={i => String(i.id)}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={() => refresh(true)}
+                  colors={[DS.primary]}
+                  tintColor={DS.primary}
+                />
+              }
+              renderItem={({ item }) => (
+                <MenuRow
+                  item={item}
+                  categories={categories}
+                  onToggle={() => handleToggle(item)}
+                  onPress={() => setDetailItem(item)}
+                />
+              )}
+              ListEmptyComponent={
+                <View style={styles.empty}>
+                  <Ionicons name="restaurant-outline" size={44} color={DS.border} />
+                  <Text style={styles.emptyTitle}>
+                    {items.length === 0 ? 'No Menu Items Yet' : 'No items match filters'}
+                  </Text>
+                  {items.length === 0 && (
+                    <Text style={styles.emptyHint}>Tap + to add your first item.</Text>
+                  )}
+                </View>
+              }
+              contentContainerStyle={[styles.listContent, { flexGrow: 1 }]}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            />
+          </FadeIn>
         )}
       </View>
 
@@ -865,13 +947,17 @@ const styles = StyleSheet.create({
   // Category chips
   catChipsRow: { flexDirection: 'row', gap: 8, paddingRight: 4 },
   catChip: {
-    paddingHorizontal: 14, paddingVertical: 7,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 10, paddingVertical: 6,
     borderRadius: 20, borderWidth: 1.5, borderColor: DS.border,
     backgroundColor: DS.surface,
   },
   catChipActive:     { backgroundColor: DS.primary, borderColor: DS.primary },
   catChipText:       { fontSize: 13, color: DS.text2, fontWeight: '500' },
   catChipTextActive: { color: '#fff', fontWeight: '700' },
+  catChipThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: DS.bg },
+  catChipThumbPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: DS.primarySoft },
+  catChipThumbInitial: { fontSize: 11, fontWeight: '800', color: DS.primary },
   catAddBtn: {
     width: 32, height: 32, borderRadius: 16,
     borderWidth: 1.5, borderColor: DS.primary,
@@ -920,9 +1006,7 @@ const styles = StyleSheet.create({
     backgroundColor: DS.surface, borderRadius: 12, padding: 12,
     marginBottom: 10, borderWidth: 1, borderColor: DS.border,
   },
-  skeletonThumb: { width: 52, height: 52, borderRadius: 8, backgroundColor: DS.bg },
   skeletonBody:  { flex: 1 },
-  skeletonLine:  { height: 13, borderRadius: 6, backgroundColor: DS.bg, width: '70%' },
 
   // List
   listContent: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 32 },
@@ -1035,7 +1119,8 @@ const styles = StyleSheet.create({
   typeBtnActive: { borderColor: DS.primary, backgroundColor: DS.primarySoft },
   typeBtnText:   { fontSize: 14, color: DS.text2, fontWeight: '500' },
   catPill: {
-    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
     borderWidth: 1, borderColor: DS.border, backgroundColor: DS.bg,
   },
   catPillActive:     { backgroundColor: DS.primary, borderColor: DS.primary },
@@ -1070,7 +1155,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: DS.border,
   },
-  catFormTitle: { fontSize: 18, fontWeight: '700', color: DS.text, marginBottom: 16 },
+  catFormHeader: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 6,
+  },
+  catFormTitle:    { fontSize: 18, fontWeight: '700', color: DS.text },
+  catFormSubtitle: { fontSize: 12.5, color: DS.text3, lineHeight: 17, marginBottom: 18 },
+  catFormImageRow: { alignItems: 'center', marginBottom: 20 },
   catFormInput: {
     backgroundColor: DS.bg, borderWidth: 1.5, borderColor: DS.border,
     borderRadius: 12, color: DS.text, fontSize: 15,
@@ -1081,40 +1172,72 @@ const styles = StyleSheet.create({
   // Detail sheet (no keyboard interaction needed — stays position:absolute)
   detailSheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: DS.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22,
-    paddingBottom: 32, paddingTop: 12,
-    borderTopWidth: 1, borderColor: DS.border,
+    backgroundColor: DS.surface, borderTopLeftRadius: 26, borderTopRightRadius: 26,
+    overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.18, shadowRadius: 24, elevation: 14,
   },
-  detailImg: {
-    alignSelf: 'center', height: 170, borderRadius: 12,
-    backgroundColor: DS.bg, marginBottom: 16, marginHorizontal: 16,
+
+  // Gradient hero header — replaces the old photo/placeholder block
+  detailHeader: { paddingTop: 12, paddingHorizontal: 20, paddingBottom: 26 },
+  sheetHandleLight: {
+    width: 36, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.45)', alignSelf: 'center', marginBottom: 18,
   },
-  detailImgPlaceholder: {
-    alignItems: 'center', justifyContent: 'center', backgroundColor: DS.primarySoft,
+  detailCloseBtn: {
+    position: 'absolute', top: 14, right: 16,
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center', justifyContent: 'center',
   },
-  detailBody:   { paddingHorizontal: 20 },
-  detailTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 10 },
-  detailName:   { fontSize: 20, fontWeight: '800', color: DS.text, letterSpacing: -0.3 },
-  detailCat:    { fontSize: 13, color: DS.text3, fontWeight: '500', marginTop: 3 },
-  detailPrice:  { fontSize: 22, fontWeight: '700', color: DS.primary, flexShrink: 0 },
-  statusChip: {
-    flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start',
-    gap: 6, paddingHorizontal: 10, paddingVertical: 5,
-    borderRadius: 20, marginBottom: 12,
+  detailEyebrowRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, paddingRight: 36,
   },
-  statusDot:  { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 13, fontWeight: '600' },
-  detailDesc: { fontSize: 14, color: DS.text2, lineHeight: 20, marginBottom: 14 },
+  detailTypeChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
+  },
+  detailTypeChipText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  detailEyebrow: {
+    fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.75)',
+    textTransform: 'uppercase', letterSpacing: 0.6, flexShrink: 1,
+  },
+  detailHeaderName: {
+    fontSize: 24, fontWeight: '800', color: '#fff',
+    letterSpacing: -0.3, marginBottom: 16, paddingRight: 30,
+  },
+  detailHeaderBottomRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  detailPriceBig: { fontSize: 30, fontWeight: '800', color: '#fff' },
+  headerStatusChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20,
+  },
+  headerStatusText: { fontSize: 12, fontWeight: '700' },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+
+  // Body
+  detailBody: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32 },
+  detailDescCard: {
+    backgroundColor: DS.bg, borderRadius: 14, padding: 14,
+    marginBottom: 18, borderLeftWidth: 3, borderLeftColor: DS.primary,
+  },
+  detailDesc: { fontSize: 14, color: DS.text2, lineHeight: 21 },
   editBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, backgroundColor: DS.primary, borderRadius: 12, height: 50, marginBottom: 10,
+    gap: 8, backgroundColor: DS.primary, borderRadius: 14, height: 52, marginBottom: 12,
+    shadowColor: DS.primary, shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3, shadowRadius: 10, elevation: 5,
   },
   editBtnText:        { fontSize: 15, fontWeight: '700', color: '#fff' },
-  detailSecondaryRow: { flexDirection: 'row', gap: 8 },
+  detailSecondaryRow: { flexDirection: 'row', gap: 10 },
   secondaryBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 5, height: 42, borderRadius: 10,
+    gap: 6, height: 46, borderRadius: 12,
     borderWidth: 1, borderColor: DS.border, backgroundColor: DS.bg,
   },
-  secondaryBtnText: { fontSize: 13, fontWeight: '600', color: DS.text2 },
+  secondaryBtnDanger: { borderColor: DS.errorSoft, backgroundColor: DS.errorSoft },
+  secondaryBtnText:   { fontSize: 13, fontWeight: '600', color: DS.text2 },
 });

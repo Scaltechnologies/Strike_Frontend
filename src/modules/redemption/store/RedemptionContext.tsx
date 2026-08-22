@@ -37,8 +37,13 @@ const initialState: RedemptionState = {
   queue: [],
   history: [],
   historyDegraded: false,
-  loadingQueue: false,
-  loadingHistory: false,
+  // Start true, not false: loadQueue/loadHistory both await ensureStore()
+  // (a network round-trip) before they dispatch *_LOADING, so on cold start
+  // there'd otherwise be a window where nothing has been dispatched yet but
+  // the screen already renders as if loading finished with zero results —
+  // Home would flash "All clear!" before the real fetch has even begun.
+  loadingQueue: true,
+  loadingHistory: true,
   refreshingQueue: false,
   refreshingHistory: false,
   errorQueue: null,
@@ -108,9 +113,12 @@ function isLazyInitError(message: string): boolean {
 interface RedemptionContextValue extends RedemptionState {
   ensureStore: () => Promise<number | null>;
   refreshStoreMeta: () => Promise<void>;
-  loadQueue: (refresh?: boolean) => Promise<void>;
-  loadHistory: (refresh?: boolean) => Promise<void>;
-  loadAll: (refresh?: boolean) => Promise<void>;
+  // `silent` skips the loading/refreshing/error dispatches entirely — used by
+  // background polling so a transient network blip doesn't flash an error
+  // banner or spinner over data the vendor is actively looking at.
+  loadQueue: (refresh?: boolean, silent?: boolean) => Promise<void>;
+  loadHistory: (refresh?: boolean, silent?: boolean) => Promise<void>;
+  loadAll: (refresh?: boolean, silent?: boolean) => Promise<void>;
   approveRedemption: (id: string) => Promise<void>;
   rejectRedemption: (id: string, reason?: string) => Promise<void>;
 }
@@ -164,22 +172,30 @@ export function RedemptionProvider({ children }: { children: React.ReactNode }) 
     }
   }, []);
 
-  const loadQueue = useCallback(async (refresh = false) => {
+  const loadQueue = useCallback(async (refresh = false, silent = false) => {
     const sid = await ensureStore();
-    if (sid == null) return;
-    dispatch({ type: 'QUEUE_LOADING', refreshing: refresh });
+    if (sid == null) {
+      // Without this, loadingQueue (which starts true) would never flip to
+      // false and the screen would be stuck on its skeleton forever.
+      if (!silent) dispatch({ type: 'QUEUE_ERROR', error: 'Could not load your store. Check your connection and try again.' });
+      return;
+    }
+    if (!silent) dispatch({ type: 'QUEUE_LOADING', refreshing: refresh });
     try {
       const data = await fetchRedemptionQueue(sid);
       dispatch({ type: 'QUEUE_SUCCESS', data });
     } catch (e: any) {
-      dispatch({ type: 'QUEUE_ERROR', error: e?.message ?? 'Failed to load redemption queue' });
+      if (!silent) dispatch({ type: 'QUEUE_ERROR', error: e?.message ?? 'Failed to load redemption queue' });
     }
   }, [ensureStore]);
 
-  const loadHistory = useCallback(async (refresh = false) => {
+  const loadHistory = useCallback(async (refresh = false, silent = false) => {
     const sid = await ensureStore();
-    if (sid == null) return;
-    dispatch({ type: 'HISTORY_LOADING', refreshing: refresh });
+    if (sid == null) {
+      if (!silent) dispatch({ type: 'HISTORY_ERROR', error: 'Could not load your store. Check your connection and try again.' });
+      return;
+    }
+    if (!silent) dispatch({ type: 'HISTORY_LOADING', refreshing: refresh });
     try {
       const data = await fetchRedemptionHistory(sid);
       dispatch({ type: 'HISTORY_SUCCESS', data, degraded: false });
@@ -200,12 +216,12 @@ export function RedemptionProvider({ children }: { children: React.ReactNode }) 
         }
       }
 
-      dispatch({ type: 'HISTORY_ERROR', error: msg || 'Failed to load redemption history' });
+      if (!silent) dispatch({ type: 'HISTORY_ERROR', error: msg || 'Failed to load redemption history' });
     }
   }, [ensureStore]);
 
-  const loadAll = useCallback(async (refresh = false) => {
-    await Promise.allSettled([loadQueue(refresh), loadHistory(refresh)]);
+  const loadAll = useCallback(async (refresh = false, silent = false) => {
+    await Promise.allSettled([loadQueue(refresh, silent), loadHistory(refresh, silent)]);
   }, [loadQueue, loadHistory]);
 
   // After approve/reject: always reload queue and history so stale items clear.

@@ -1,8 +1,10 @@
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  View, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, StatusBar, ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
+import Text from '../../components/Text';
+import TextInput from '../../components/TextInput';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

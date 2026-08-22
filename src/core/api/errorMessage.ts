@@ -14,7 +14,7 @@ export function getUserMessage(
   fallback = 'Something went wrong. Please try again.',
 ): string {
   const raw = err instanceof Error ? err.message : String(err ?? '');
-  if (raw) console.error('[API error]', raw);
+  if (raw && __DEV__) console.error('[API error]', raw);
 
   const looksRaw = raw.length > 220 || RAW_EXCEPTION_MARKERS.some(marker => raw.includes(marker));
   return !raw || looksRaw ? fallback : raw;

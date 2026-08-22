@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Alert } from 'react-native';
 import {
   fetchCategories,
@@ -6,6 +6,7 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  uploadCategoryImage,
   createMenuItem,
   updateMenuItem,
   deleteMenuItem,
@@ -21,10 +22,13 @@ export interface UseMenuReturn {
   categories: CategoryResponse[];
   items: MenuItemResponse[];
   loading: boolean;
-  refresh: () => Promise<void>;
+  refreshing: boolean;
+  refresh: (isRefresh?: boolean) => Promise<void>;
   // Category CRUD
-  addCategory: (name: string) => Promise<void>;
-  editCategory: (id: number, name: string) => Promise<void>;
+  // imageUri is a local device file URI from the picker — pass it only when
+  // the vendor picked a new photo; omit it to leave the existing image untouched.
+  addCategory: (name: string, imageUri?: string) => Promise<void>;
+  editCategory: (id: number, name: string, imageUri?: string) => Promise<void>;
   removeCategory: (id: number) => Promise<void>;
   // Item CRUD
   toggleAvailability: (item: MenuItemResponse) => Promise<void>;
@@ -37,9 +41,10 @@ export function useMenu(): UseMenuReturn {
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [items, setItems]           = useState<MenuItemResponse[]>([]);
   const [loading, setLoading]       = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
       const [cats, menuItems] = await Promise.all([fetchCategories(), fetchMenuItems()]);
       setCategories(cats);
@@ -48,20 +53,28 @@ export function useMenu(): UseMenuReturn {
       Alert.alert('Error', err?.message ?? 'Failed to load menu');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  // Fetch is driven by the screen (useFocusEffect) rather than mount here,
+  // so revisiting the Menu tab always picks up changes made elsewhere.
 
   // ── Category CRUD ──────────────────────────────────────────────────
 
-  const addCategory = useCallback(async (name: string) => {
-    const created = await createCategory({ name });
+  const addCategory = useCallback(async (name: string, imageUri?: string) => {
+    let created = await createCategory({ name });
+    if (imageUri) {
+      created = await uploadCategoryImage(created.id, imageUri);
+    }
     setCategories(prev => [...prev, created]);
   }, []);
 
-  const editCategory = useCallback(async (id: number, name: string) => {
-    const updated = await updateCategory(id, { name });
+  const editCategory = useCallback(async (id: number, name: string, imageUri?: string) => {
+    let updated = await updateCategory(id, { name });
+    if (imageUri) {
+      updated = await uploadCategoryImage(id, imageUri);
+    }
     setCategories(prev => prev.map(c => (c.id === id ? updated : c)));
   }, []);
 
@@ -112,6 +125,7 @@ export function useMenu(): UseMenuReturn {
     categories,
     items,
     loading,
+    refreshing,
     refresh,
     addCategory,
     editCategory,

@@ -1,13 +1,17 @@
 import { useState, useCallback } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, FlatList,
+  View, TouchableOpacity, FlatList,
   StyleSheet, StatusBar, RefreshControl, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Text from '../../../components/Text';
+import TextInput from '../../../components/TextInput';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getMyDashboard } from '../../modules/dashboard/services/dashboardService';
-import type { DashboardSummaryResponse, ActiveCardSummary } from '../../modules/dashboard/types/dashboard.types';
+import { getMyDashboard } from '../../../modules/dashboard/services/dashboardService';
+import type { DashboardSummaryResponse, ActiveCardSummary } from '../../../modules/dashboard/types/dashboard.types';
+import { SkeletonBlock } from '../../../components/Skeleton';
+import FadeIn from '../../../components/FadeIn';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -37,34 +41,30 @@ function formatCurrency(n: number) {
   return '₹' + n.toLocaleString('en-IN');
 }
 
-function SkeletonBlock({ w, h, radius = 8 }: { w: number | string; h: number; radius?: number }) {
-  return <View style={{ width: w as any, height: h, borderRadius: radius, backgroundColor: '#3A3A3A' }} />;
-}
-
 function SkeletonDark() {
   return (
-    <View style={{ gap: 12 }}>
+    <FadeIn style={{ gap: 12 }}>
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <View style={[styles.statCard, { flex: 1 }]}>
-          <SkeletonBlock w="60%" h={28} />
-          <SkeletonBlock w="80%" h={11} radius={5} />
+          <SkeletonBlock w="60%" h={28} color="#3A3A3A" />
+          <SkeletonBlock w="80%" h={11} radius={5} color="#3A3A3A" />
         </View>
         <View style={[styles.statCard, { flex: 1 }]}>
-          <SkeletonBlock w="60%" h={28} />
-          <SkeletonBlock w="80%" h={11} radius={5} />
+          <SkeletonBlock w="60%" h={28} color="#3A3A3A" />
+          <SkeletonBlock w="80%" h={11} radius={5} color="#3A3A3A" />
         </View>
       </View>
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <View style={[styles.statCard, { flex: 1 }]}>
-          <SkeletonBlock w="60%" h={28} />
-          <SkeletonBlock w="80%" h={11} radius={5} />
+          <SkeletonBlock w="60%" h={28} color="#3A3A3A" />
+          <SkeletonBlock w="80%" h={11} radius={5} color="#3A3A3A" />
         </View>
         <View style={[styles.statCard, { flex: 1 }]}>
-          <SkeletonBlock w="60%" h={28} />
-          <SkeletonBlock w="80%" h={11} radius={5} />
+          <SkeletonBlock w="60%" h={28} color="#3A3A3A" />
+          <SkeletonBlock w="80%" h={11} radius={5} color="#3A3A3A" />
         </View>
       </View>
-    </View>
+    </FadeIn>
   );
 }
 
@@ -184,15 +184,15 @@ export default function DashboardScreen() {
         {loading ? (
           <SkeletonDark />
         ) : error ? (
-          <View style={styles.errorBox}>
+          <FadeIn style={styles.errorBox}>
             <Ionicons name="warning-outline" size={18} color="#f87171" />
             <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity onPress={() => load()} style={styles.retryDarkBtn}>
               <Text style={styles.retryDarkText}>Retry</Text>
             </TouchableOpacity>
-          </View>
+          </FadeIn>
         ) : data ? (
-          <StatGrid data={data} />
+          <FadeIn><StatGrid data={data} /></FadeIn>
         ) : null}
       </View>
 

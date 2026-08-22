@@ -9,6 +9,11 @@
 // TOP_UP         — wallet topped up (defined in backend, not yet triggered)
 export type TransactionType = 'CARD_PURCHASE' | 'REDEMPTION' | 'REFUND' | 'TOP_UP';
 
+// status is null for rows created before the field existed — treat null the same as 'ACTIVE'.
+// 'REVERSED' means a cancelled/duplicate purchase; excluded from revenue totals server-side,
+// so it must never render as a normal credit here either.
+export type TransactionStatus = 'ACTIVE' | 'REVERSED' | null;
+
 // Response: GET /api/ledger/store/{storeId}  (content items inside PageResponse)
 export interface TransactionResponse {
   id: number;
@@ -18,6 +23,7 @@ export interface TransactionResponse {
   transactionType: TransactionType;
   amount: number;       // BigDecimal — serialised as number in JSON
   remarks: string | null;
+  status: TransactionStatus;
   createdAt: string;    // ISO-8601 LocalDateTime
 }
 

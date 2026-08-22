@@ -1,10 +1,12 @@
 import { useState, useCallback } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  View, TouchableOpacity, StyleSheet,
   StatusBar, ScrollView, Alert, ActivityIndicator,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Text from '../../components/Text';
+import TextInput from '../../components/TextInput';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -13,6 +15,8 @@ import {
   deactivateCard,
   getCardPreview,
 } from '../../modules/cards/services/cardService';
+import { getCardAccent } from '../../modules/cards/cardVisuals';
+import VegNonVegBadge from '../../modules/menu/components/VegNonVegBadge';
 import type {
   CardDefinitionResponse,
   UpdateCardRequest,
@@ -60,6 +64,16 @@ export default function CardDetailScreen() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving]   = useState(false);
   const [toggling, setToggling] = useState(false);
+  const [expandedCats, setExpandedCats] = useState<Set<number>>(new Set());
+
+  const toggleCategory = (categoryId: number) => {
+    setExpandedCats(prev => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) next.delete(categoryId);
+      else next.add(categoryId);
+      return next;
+    });
+  };
 
   // Edit form state (initialised when entering edit mode)
   const [editName, setEditName]       = useState('');
@@ -187,6 +201,7 @@ export default function CardDetailScreen() {
   }
 
   const bonusAmt = card.walletAmount - card.cardPrice;
+  const accent    = getCardAccent(card.id);
   const editWalletNum = parseFloat(editWallet) || 0;
   const editPriceNum  = parseFloat(editPrice)  || 0;
   const editBonus     = editWalletNum - editPriceNum;
@@ -244,24 +259,25 @@ export default function CardDetailScreen() {
               </Text>
             </View>
 
-            {/* Pricing hero */}
-            <View style={styles.heroCard}>
+            {/* Pricing hero — flat solid fill (getCardAccent) matching this
+                card's color in My Cards, for visual continuity */}
+            <View style={[styles.heroCard, { backgroundColor: accent }]}>
               <View style={styles.heroRow}>
                 <View style={styles.heroBlock}>
                   <Text style={styles.heroLabel}>CARD PRICE</Text>
                   <Text style={styles.heroPrice}>₹{card.cardPrice}</Text>
                 </View>
                 <View style={styles.heroArrow}>
-                  <Ionicons name="arrow-forward-circle" size={28} color={DS.border} />
+                  <Ionicons name="arrow-forward-circle" size={28} color="rgba(255,255,255,0.55)" />
                 </View>
                 <View style={styles.heroBlock}>
                   <Text style={styles.heroLabel}>WALLET VALUE</Text>
-                  <Text style={[styles.heroPrice, { color: DS.primary }]}>₹{card.walletAmount}</Text>
+                  <Text style={[styles.heroPrice, styles.heroPriceAccent]}>₹{card.walletAmount}</Text>
                 </View>
               </View>
               {bonusAmt > 0 && (
                 <View style={styles.bonusPill}>
-                  <Ionicons name="trending-up-outline" size={14} color={DS.success} />
+                  <Ionicons name="trending-up-outline" size={14} color="#fff" />
                   <Text style={styles.bonusPillText}>Customer saves ₹{bonusAmt}</Text>
                 </View>
               )}
@@ -291,34 +307,55 @@ export default function CardDetailScreen() {
               )}
             </View>
 
-            {/* Eligible menu */}
+            {/* Eligible menu — categories collapsed by default so a card with
+                many categories reads as a short overview, not a wall of
+                items; tap a category to see what's in it */}
             {preview && preview.eligibleMenus.length > 0 && (
               <View style={styles.detailCard}>
                 <Text style={styles.detailCardTitle}>ELIGIBLE MENU</Text>
-                {preview.eligibleMenus.map((menuCat, mIdx) => (
-                  <View key={menuCat.categoryId}>
-                    {mIdx > 0 && <View style={styles.infoDivider} />}
-                    <View style={styles.menuCatRow}>
-                      <Text style={styles.menuCatName}>{menuCat.categoryName}</Text>
-                      <Text style={styles.menuCatCount}>{menuCat.items.length} items</Text>
+                <Text style={styles.menuSummary}>
+                  {preview.eligibleMenus.reduce((sum, c) => sum + c.items.length, 0)} items across{' '}
+                  {preview.eligibleMenus.length} {preview.eligibleMenus.length === 1 ? 'category' : 'categories'}
+                </Text>
+                {preview.eligibleMenus.map((menuCat, mIdx) => {
+                  const isOpen = expandedCats.has(menuCat.categoryId);
+                  return (
+                    <View key={menuCat.categoryId}>
+                      {mIdx > 0 && <View style={styles.infoDivider} />}
+                      <TouchableOpacity
+                        style={styles.menuCatRow}
+                        onPress={() => toggleCategory(menuCat.categoryId)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.menuCatLeft}>
+                          <Ionicons
+                            name={isOpen ? 'chevron-down' : 'chevron-forward'}
+                            size={16}
+                            color={DS.text3}
+                          />
+                          <Text style={styles.menuCatName}>{menuCat.categoryName}</Text>
+                        </View>
+                        <Text style={styles.menuCatCount}>{menuCat.items.length} items</Text>
+                      </TouchableOpacity>
+                      {isOpen && (
+                        <View style={styles.menuItemsWrap}>
+                          {menuCat.items.map(item => (
+                            <View key={item.itemId} style={styles.menuItemRow}>
+                              <VegNonVegBadge type={item.itemType} size={13} />
+                              <Text style={styles.menuItemName} numberOfLines={1}>{item.name}</Text>
+                              <Text style={styles.menuItemPrice}>₹{item.price}</Text>
+                              {item.availabilityStatus === 'OUT_OF_STOCK' && (
+                                <View style={styles.oosBadge}>
+                                  <Text style={styles.oosText}>OOS</Text>
+                                </View>
+                              )}
+                            </View>
+                          ))}
+                        </View>
+                      )}
                     </View>
-                    {menuCat.items.map(item => (
-                      <View key={item.itemId} style={styles.menuItemRow}>
-                        <View style={[
-                          styles.itemTypeDot,
-                          { backgroundColor: item.itemType === 'VEG' ? DS.success : DS.primary },
-                        ]} />
-                        <Text style={styles.menuItemName} numberOfLines={1}>{item.name}</Text>
-                        <Text style={styles.menuItemPrice}>₹{item.price}</Text>
-                        {item.availabilityStatus === 'OUT_OF_STOCK' && (
-                          <View style={styles.oosBadge}>
-                            <Text style={styles.oosText}>OOS</Text>
-                          </View>
-                        )}
-                      </View>
-                    ))}
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             )}
 
@@ -494,23 +531,25 @@ const styles = StyleSheet.create({
   statusDot:            { width: 8, height: 8, borderRadius: 4 },
   statusBannerText:     { fontSize: 13, fontWeight: '600', flex: 1 },
 
-  // Hero pricing card
+  // Hero pricing card — flat solid fill (per-card accent, getCardAccent)
   heroCard: {
-    backgroundColor: DS.surface, borderRadius: 16,
-    borderWidth: 1, borderColor: DS.border,
+    borderRadius: 18, overflow: 'hidden',
     padding: 20, marginBottom: 12, alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12, shadowRadius: 10, elevation: 4,
   },
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 12 },
   heroBlock:  { alignItems: 'center', flex: 1 },
   heroArrow:  { alignItems: 'center' },
-  heroLabel:  { fontSize: 10, fontWeight: '700', color: DS.text3, letterSpacing: 0.8, marginBottom: 6 },
-  heroPrice:  { fontSize: 28, fontWeight: '900', color: DS.text },
+  heroLabel:  { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.8)', letterSpacing: 0.8, marginBottom: 6 },
+  heroPrice:  { fontSize: 28, fontWeight: '900', color: '#fff' },
+  heroPriceAccent: { color: '#FFE9B3' },
   bonusPill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: DS.successSoft, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 20,
     paddingHorizontal: 14, paddingVertical: 6,
   },
-  bonusPillText: { fontSize: 13, fontWeight: '700', color: DS.success },
+  bonusPillText: { fontSize: 13, fontWeight: '700', color: '#fff' },
 
   // Detail card
   detailCard: {
@@ -591,11 +630,16 @@ const styles = StyleSheet.create({
   saveBtnText:     { fontSize: 15, fontWeight: '700', color: '#fff' },
 
   // Eligible menu section
-  menuCatRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
-  menuCatName:  { fontSize: 13, fontWeight: '700', color: DS.text },
+  menuSummary:  { fontSize: 12, color: DS.text3, marginTop: -6, marginBottom: 10 },
+  menuCatRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 },
+  menuCatLeft:  { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
+  menuCatName:  { fontSize: 14, fontWeight: '700', color: DS.text },
   menuCatCount: { fontSize: 12, color: DS.text3, fontWeight: '500' },
-  menuItemRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5, paddingLeft: 8 },
-  itemTypeDot:  { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
+  menuItemsWrap: {
+    borderLeftWidth: 2, borderLeftColor: DS.border,
+    marginLeft: 7, paddingLeft: 13, marginBottom: 6,
+  },
+  menuItemRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
   menuItemName: { flex: 1, fontSize: 13, color: DS.text2 },
   menuItemPrice:{ fontSize: 13, fontWeight: '600', color: DS.text2 },
   oosBadge:     { backgroundColor: '#FFFBEB', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
