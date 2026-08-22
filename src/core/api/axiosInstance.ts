@@ -10,7 +10,7 @@ import {
 } from '../storage/secureStorage';
 import { setMaintenance } from '../maintenance/maintenanceStore';
 
-export const BASE_URL = 'http://192.168.88.93:8080';
+export const BASE_URL = 'https://api.strikeapp.in';
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
