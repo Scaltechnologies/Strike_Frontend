@@ -2,9 +2,10 @@ import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View, TouchableOpacity, FlatList, StyleSheet,
   StatusBar, Switch, Image, Alert, Modal, ScrollView, Animated,
-  Platform, Keyboard, KeyboardAvoidingView, Share,
+  Platform, Keyboard, KeyboardAvoidingView, Share, RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Text from '../../../components/Text';
 import TextInput from '../../../components/TextInput';
@@ -15,6 +16,10 @@ import {
   MenuItemResponse,
   CreateMenuItemRequest,
 } from '../../../modules/menu/hooks/useMenu';
+import CategoryImagePicker from '../../../modules/menu/components/CategoryImagePicker';
+import { resolveMediaUrl } from '../../../core/api/mediaUrl';
+import { SkeletonBlock } from '../../../components/Skeleton';
+import FadeIn from '../../../components/FadeIn';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -72,10 +77,11 @@ function useToast() {
 function SkeletonRow() {
   return (
     <View style={styles.skeletonRow}>
-      <View style={styles.skeletonThumb} />
+      <SkeletonBlock w={52} h={52} radius={8} color={DS.bg} />
       <View style={styles.skeletonBody}>
-        <View style={styles.skeletonLine} />
-        <View style={[styles.skeletonLine, { width: '45%', marginTop: 7 }]} />
+        <SkeletonBlock w="70%" h={13} radius={6} color={DS.bg} />
+        <View style={{ height: 7 }} />
+        <SkeletonBlock w="45%" h={13} radius={6} color={DS.bg} />
       </View>
     </View>
   );
@@ -86,17 +92,25 @@ function SkeletonRow() {
 interface CatFormProps {
   visible: boolean;
   initial?: CategoryResponse | null;
-  onSave: (name: string) => void;
+  onSave: (name: string, imageUri?: string) => void;
   onClose: () => void;
   saving: boolean;
 }
 
 function CategoryFormModal({ visible, initial, onSave, onClose, saving }: CatFormProps) {
-  const [name, setName] = useState('');
+  const [name, setName]         = useState('');
+  const [pickedUri, setPicked]  = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    if (visible) setName(initial?.name ?? '');
+    if (visible) {
+      setName(initial?.name ?? '');
+      setPicked(undefined);
+    }
   }, [visible, initial]);
+
+  // A freshly-picked local photo takes priority over whatever the category
+  // already has saved on the server.
+  const previewUri = pickedUri ?? resolveMediaUrl(initial?.imageUrl) ?? null;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -121,14 +135,32 @@ function CategoryFormModal({ visible, initial, onSave, onClose, saving }: CatFor
         style={styles.kavContainer}
       >
         <View style={styles.catFormSheet}>
-          <Text style={styles.catFormTitle}>
-            {initial ? 'Rename Category' : 'New Category'}
+          <View style={styles.catFormHeader}>
+            <Text style={styles.catFormTitle}>
+              {initial ? 'Edit Category' : 'New Category'}
+            </Text>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="close" size={18} color={DS.text2} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.catFormSubtitle}>
+            Give it a name and a photo — this is how customers will spot it while browsing.
           </Text>
+
+          <View style={styles.catFormImageRow}>
+            <CategoryImagePicker uri={previewUri} onPick={setPicked} />
+          </View>
+
+          <Text style={styles.fieldLabel}>Category Name *</Text>
           <TextInput
             style={styles.catFormInput}
             value={name}
             onChangeText={setName}
-            placeholder="Category name"
+            placeholder="e.g. Starters, Beverages, Desserts"
             placeholderTextColor={DS.text3}
             autoFocus
             maxLength={60}
@@ -139,7 +171,7 @@ function CategoryFormModal({ visible, initial, onSave, onClose, saving }: CatFor
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.saveBtn, (!name.trim() || saving) && { opacity: 0.45 }]}
-              onPress={() => name.trim() && onSave(name.trim())}
+              onPress={() => name.trim() && onSave(name.trim(), pickedUri)}
               disabled={!name.trim() || saving}
             >
               <Text style={styles.saveBtnText}>{saving ? 'Saving…' : 'Save'}</Text>
@@ -255,17 +287,27 @@ function ItemFormModal({ visible, initial, categories, onSave, onClose }: ItemFo
               keyboardShouldPersistTaps="handled"
             >
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                {categories.map(cat => (
-                  <TouchableOpacity
-                    key={cat.id}
-                    onPress={() => setCatId(cat.id)}
-                    style={[styles.catPill, categoryId === cat.id && styles.catPillActive]}
-                  >
-                    <Text style={[styles.catPillText, categoryId === cat.id && styles.catPillTextActive]}>
-                      {cat.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {categories.map(cat => {
+                  const thumb = resolveMediaUrl(cat.imageUrl);
+                  return (
+                    <TouchableOpacity
+                      key={cat.id}
+                      onPress={() => setCatId(cat.id)}
+                      style={[styles.catPill, categoryId === cat.id && styles.catPillActive]}
+                    >
+                      {thumb ? (
+                        <Image source={{ uri: thumb }} style={styles.catChipThumb} />
+                      ) : (
+                        <View style={[styles.catChipThumb, styles.catChipThumbPlaceholder]}>
+                          <Text style={styles.catChipThumbInitial}>{cat.name.charAt(0).toUpperCase()}</Text>
+                        </View>
+                      )}
+                      <Text style={[styles.catPillText, categoryId === cat.id && styles.catPillTextActive]}>
+                        {cat.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </ScrollView>
 
@@ -540,10 +582,12 @@ const AVAIL_FILTERS: { key: AvailFilter; label: string }[] = [
 export default function MenuScreen() {
   const insets = useSafeAreaInsets();
   const {
-    categories, items, loading,
+    categories, items, loading, refreshing, refresh,
     addCategory, editCategory, removeCategory,
     toggleAvailability, addItem, editItem, removeItem,
   } = useMenu();
+
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
   const [search, setSearch]            = useState('');
   const [availFilter, setAvailFilter]  = useState<AvailFilter>('all');
@@ -580,14 +624,14 @@ export default function MenuScreen() {
 
   // ── Category handlers ─────────────────────────────────────────────
 
-  const handleSaveCat = useCallback(async (name: string) => {
+  const handleSaveCat = useCallback(async (name: string, imageUri?: string) => {
     setCatSaving(true);
     try {
       if (editingCat) {
-        await editCategory(editingCat.id, name);
-        showToast('Category renamed', 'ok');
+        await editCategory(editingCat.id, name, imageUri);
+        showToast('Category updated', 'ok');
       } else {
-        await addCategory(name);
+        await addCategory(name, imageUri);
         showToast('Category added', 'ok');
       }
       setCatForm(false);
@@ -601,7 +645,7 @@ export default function MenuScreen() {
 
   const handleCatLongPress = useCallback((cat: CategoryResponse) => {
     Alert.alert(cat.name, undefined, [
-      { text: 'Rename', onPress: () => { setEditingCat(cat); setCatForm(true); } },
+      { text: 'Edit', onPress: () => { setEditingCat(cat); setCatForm(true); } },
       {
         text: 'Delete', style: 'destructive',
         onPress: () => Alert.alert(
@@ -715,18 +759,28 @@ export default function MenuScreen() {
             </Text>
           </TouchableOpacity>
 
-          {categories.map(cat => (
-            <TouchableOpacity
-              key={cat.id}
-              onPress={() => setSelCatId(prev => (prev === cat.id ? null : cat.id))}
-              onLongPress={() => handleCatLongPress(cat)}
-              style={[styles.catChip, selectedCatId === cat.id && styles.catChipActive]}
-            >
-              <Text style={[styles.catChipText, selectedCatId === cat.id && styles.catChipTextActive]}>
-                {cat.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {categories.map(cat => {
+            const thumb = resolveMediaUrl(cat.imageUrl);
+            return (
+              <TouchableOpacity
+                key={cat.id}
+                onPress={() => setSelCatId(prev => (prev === cat.id ? null : cat.id))}
+                onLongPress={() => handleCatLongPress(cat)}
+                style={[styles.catChip, selectedCatId === cat.id && styles.catChipActive]}
+              >
+                {thumb ? (
+                  <Image source={{ uri: thumb }} style={styles.catChipThumb} />
+                ) : (
+                  <View style={[styles.catChipThumb, styles.catChipThumbPlaceholder]}>
+                    <Text style={styles.catChipThumbInitial}>{cat.name.charAt(0).toUpperCase()}</Text>
+                  </View>
+                )}
+                <Text style={[styles.catChipText, selectedCatId === cat.id && styles.catChipTextActive]}>
+                  {cat.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
 
           <TouchableOpacity
             style={styles.catAddBtn}
@@ -795,32 +849,42 @@ export default function MenuScreen() {
             {[1, 2, 3, 4].map(k => <SkeletonRow key={k} />)}
           </ScrollView>
         ) : (
-          <FlatList
-            data={filtered}
-            keyExtractor={i => String(i.id)}
-            renderItem={({ item }) => (
-              <MenuRow
-                item={item}
-                categories={categories}
-                onToggle={() => handleToggle(item)}
-                onPress={() => setDetailItem(item)}
-              />
-            )}
-            ListEmptyComponent={
-              <View style={styles.empty}>
-                <Ionicons name="restaurant-outline" size={44} color={DS.border} />
-                <Text style={styles.emptyTitle}>
-                  {items.length === 0 ? 'No Menu Items Yet' : 'No items match filters'}
-                </Text>
-                {items.length === 0 && (
-                  <Text style={styles.emptyHint}>Tap + to add your first item.</Text>
-                )}
-              </View>
-            }
-            contentContainerStyle={[styles.listContent, { flexGrow: 1 }]}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          />
+          <FadeIn style={{ flex: 1 }}>
+            <FlatList
+              data={filtered}
+              keyExtractor={i => String(i.id)}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={() => refresh(true)}
+                  colors={[DS.primary]}
+                  tintColor={DS.primary}
+                />
+              }
+              renderItem={({ item }) => (
+                <MenuRow
+                  item={item}
+                  categories={categories}
+                  onToggle={() => handleToggle(item)}
+                  onPress={() => setDetailItem(item)}
+                />
+              )}
+              ListEmptyComponent={
+                <View style={styles.empty}>
+                  <Ionicons name="restaurant-outline" size={44} color={DS.border} />
+                  <Text style={styles.emptyTitle}>
+                    {items.length === 0 ? 'No Menu Items Yet' : 'No items match filters'}
+                  </Text>
+                  {items.length === 0 && (
+                    <Text style={styles.emptyHint}>Tap + to add your first item.</Text>
+                  )}
+                </View>
+              }
+              contentContainerStyle={[styles.listContent, { flexGrow: 1 }]}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            />
+          </FadeIn>
         )}
       </View>
 
@@ -883,13 +947,17 @@ const styles = StyleSheet.create({
   // Category chips
   catChipsRow: { flexDirection: 'row', gap: 8, paddingRight: 4 },
   catChip: {
-    paddingHorizontal: 14, paddingVertical: 7,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 10, paddingVertical: 6,
     borderRadius: 20, borderWidth: 1.5, borderColor: DS.border,
     backgroundColor: DS.surface,
   },
   catChipActive:     { backgroundColor: DS.primary, borderColor: DS.primary },
   catChipText:       { fontSize: 13, color: DS.text2, fontWeight: '500' },
   catChipTextActive: { color: '#fff', fontWeight: '700' },
+  catChipThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: DS.bg },
+  catChipThumbPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: DS.primarySoft },
+  catChipThumbInitial: { fontSize: 11, fontWeight: '800', color: DS.primary },
   catAddBtn: {
     width: 32, height: 32, borderRadius: 16,
     borderWidth: 1.5, borderColor: DS.primary,
@@ -938,9 +1006,7 @@ const styles = StyleSheet.create({
     backgroundColor: DS.surface, borderRadius: 12, padding: 12,
     marginBottom: 10, borderWidth: 1, borderColor: DS.border,
   },
-  skeletonThumb: { width: 52, height: 52, borderRadius: 8, backgroundColor: DS.bg },
   skeletonBody:  { flex: 1 },
-  skeletonLine:  { height: 13, borderRadius: 6, backgroundColor: DS.bg, width: '70%' },
 
   // List
   listContent: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 32 },
@@ -1053,7 +1119,8 @@ const styles = StyleSheet.create({
   typeBtnActive: { borderColor: DS.primary, backgroundColor: DS.primarySoft },
   typeBtnText:   { fontSize: 14, color: DS.text2, fontWeight: '500' },
   catPill: {
-    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
     borderWidth: 1, borderColor: DS.border, backgroundColor: DS.bg,
   },
   catPillActive:     { backgroundColor: DS.primary, borderColor: DS.primary },
@@ -1088,7 +1155,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: DS.border,
   },
-  catFormTitle: { fontSize: 18, fontWeight: '700', color: DS.text, marginBottom: 16 },
+  catFormHeader: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 6,
+  },
+  catFormTitle:    { fontSize: 18, fontWeight: '700', color: DS.text },
+  catFormSubtitle: { fontSize: 12.5, color: DS.text3, lineHeight: 17, marginBottom: 18 },
+  catFormImageRow: { alignItems: 'center', marginBottom: 20 },
   catFormInput: {
     backgroundColor: DS.bg, borderWidth: 1.5, borderColor: DS.border,
     borderRadius: 12, color: DS.text, fontSize: 15,

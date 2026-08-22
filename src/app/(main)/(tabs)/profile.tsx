@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View, TouchableOpacity, StyleSheet,
-  StatusBar, ScrollView, Alert, ActivityIndicator,
+  StatusBar, ScrollView, Alert, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Text from '../../../components/Text';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { clearAll } from '../../../core/storage/secureStorage';
 import { deregisterCurrentPushToken } from '../../../modules/notifications/push/pushRegistration';
@@ -21,6 +21,8 @@ import type {
   VendorProfileStatus,
 } from '../../../modules/vendor/types/vendor.types';
 import type { StoreStatus } from '../../../modules/store/types/store.types';
+import { SkeletonBlock } from '../../../components/Skeleton';
+import FadeIn from '../../../components/FadeIn';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -59,6 +61,26 @@ interface NavRowDef {
   subtitle?: string;
   onPress: () => void;
   disabled?: boolean;
+}
+
+function ProfileSkeleton() {
+  return (
+    <FadeIn>
+      <View style={styles.heroZone}>
+        <SkeletonBlock w={80} h={80} radius={40} style={{ marginBottom: 14 }} />
+        <SkeletonBlock w={160} h={20} radius={6} style={{ marginBottom: 8 }} />
+        <SkeletonBlock w={110} h={13} radius={6} />
+      </View>
+      <View style={styles.statsRow}>
+        {[0, 1, 2].map(i => (
+          <View key={i} style={styles.statCard}>
+            <SkeletonBlock w={36} h={18} radius={5} style={{ marginBottom: 6 }} />
+            <SkeletonBlock w={48} h={9}  radius={4} />
+          </View>
+        ))}
+      </View>
+    </FadeIn>
+  );
 }
 
 function Section({ title, rows }: { title: string; rows: NavRowDef[] }) {
@@ -107,8 +129,10 @@ export default function ProfileScreen() {
   const [activeCards, setActiveCards] = useState<number | null>(null);
   const [storeStatus, setStoreStatus] = useState<StoreStatus | null>(null);
   const [loading, setLoading]         = useState(true);
+  const [refreshing, setRefreshing]   = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
       const [p, s, cards, store] = await Promise.all([
         getVendorProfile(),
@@ -124,10 +148,11 @@ export default function ProfileScreen() {
       // profile degrades gracefully — logout still works
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -228,13 +253,23 @@ export default function ProfileScreen() {
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => load(true)}
+            colors={[DS.primary]}
+            tintColor={DS.primary}
+          />
+        }
       >
-        {/* Avatar / hero section */}
-        <View style={[styles.heroZone, { paddingTop: insets.top + 24 }]}>
-          {loading ? (
-            <ActivityIndicator color={DS.primary} style={{ paddingVertical: 48 }} />
-          ) : (
-            <>
+        {loading ? (
+          <View style={{ paddingTop: insets.top + 24 }}>
+            <ProfileSkeleton />
+          </View>
+        ) : (
+          <FadeIn>
+            {/* Avatar / hero section */}
+            <View style={[styles.heroZone, { paddingTop: insets.top + 24 }]}>
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>{initials}</Text>
               </View>
@@ -252,37 +287,37 @@ export default function ProfileScreen() {
                   </Text>
                 </View>
               )}
-            </>
-          )}
-        </View>
+            </View>
 
-        {/* Stats strip */}
-        {!loading && !!vstatus && (
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{vstatus.commissionRate}%</Text>
-              <Text style={styles.statLabel}>COMMISSION</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statCard}>
-              <Text style={[styles.statValue, { color: DS.success }]}>
-                {activeCards ?? '—'}
-              </Text>
-              <Text style={styles.statLabel}>CARDS</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statCard}>
-              {(() => {
-                const sm = storeStatusMeta(storeStatus);
-                return (
-                  <>
-                    <Text style={[styles.statValue, { color: sm.color }]}>{sm.label}</Text>
-                    <Text style={styles.statLabel}>STORE</Text>
-                  </>
-                );
-              })()}
-            </View>
-          </View>
+            {/* Stats strip */}
+            {!!vstatus && (
+              <View style={styles.statsRow}>
+                <View style={styles.statCard}>
+                  <Text style={styles.statValue}>{vstatus.commissionRate}%</Text>
+                  <Text style={styles.statLabel}>COMMISSION</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statCard}>
+                  <Text style={[styles.statValue, { color: DS.success }]}>
+                    {activeCards ?? '—'}
+                  </Text>
+                  <Text style={styles.statLabel}>CARDS</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statCard}>
+                  {(() => {
+                    const sm = storeStatusMeta(storeStatus);
+                    return (
+                      <>
+                        <Text style={[styles.statValue, { color: sm.color }]}>{sm.label}</Text>
+                        <Text style={styles.statLabel}>STORE</Text>
+                      </>
+                    );
+                  })()}
+                </View>
+              </View>
+            )}
+          </FadeIn>
         )}
 
         {/* Nav sections */}

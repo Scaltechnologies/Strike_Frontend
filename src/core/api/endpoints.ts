@@ -40,6 +40,7 @@ const endpoints = {
   menu: {
     categories:        '/api/menu/categories',
     category:          (categoryId: number) => `/api/menu/categories/${categoryId}`,
+    categoryImage:     (categoryId: number) => `/api/menu/categories/${categoryId}/image`,
     items:             '/api/menu/items',
     item:              (itemId: number) => `/api/menu/items/${itemId}`,
     itemsByCategory:   (categoryId: number) => `/api/menu/items/by-category/${categoryId}`,

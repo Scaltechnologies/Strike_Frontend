@@ -37,8 +37,13 @@ const initialState: RedemptionState = {
   queue: [],
   history: [],
   historyDegraded: false,
-  loadingQueue: false,
-  loadingHistory: false,
+  // Start true, not false: loadQueue/loadHistory both await ensureStore()
+  // (a network round-trip) before they dispatch *_LOADING, so on cold start
+  // there'd otherwise be a window where nothing has been dispatched yet but
+  // the screen already renders as if loading finished with zero results —
+  // Home would flash "All clear!" before the real fetch has even begun.
+  loadingQueue: true,
+  loadingHistory: true,
   refreshingQueue: false,
   refreshingHistory: false,
   errorQueue: null,
@@ -169,7 +174,12 @@ export function RedemptionProvider({ children }: { children: React.ReactNode }) 
 
   const loadQueue = useCallback(async (refresh = false, silent = false) => {
     const sid = await ensureStore();
-    if (sid == null) return;
+    if (sid == null) {
+      // Without this, loadingQueue (which starts true) would never flip to
+      // false and the screen would be stuck on its skeleton forever.
+      if (!silent) dispatch({ type: 'QUEUE_ERROR', error: 'Could not load your store. Check your connection and try again.' });
+      return;
+    }
     if (!silent) dispatch({ type: 'QUEUE_LOADING', refreshing: refresh });
     try {
       const data = await fetchRedemptionQueue(sid);
@@ -181,7 +191,10 @@ export function RedemptionProvider({ children }: { children: React.ReactNode }) 
 
   const loadHistory = useCallback(async (refresh = false, silent = false) => {
     const sid = await ensureStore();
-    if (sid == null) return;
+    if (sid == null) {
+      if (!silent) dispatch({ type: 'HISTORY_ERROR', error: 'Could not load your store. Check your connection and try again.' });
+      return;
+    }
     if (!silent) dispatch({ type: 'HISTORY_LOADING', refreshing: refresh });
     try {
       const data = await fetchRedemptionHistory(sid);

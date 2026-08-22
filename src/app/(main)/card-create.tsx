@@ -7,8 +7,10 @@ import {
 import Text from '../../components/Text';
 import TextInput from '../../components/TextInput';
 import Animated, {
-  useSharedValue, useAnimatedStyle, withTiming, withDelay, withSpring, Easing,
+  useSharedValue, useAnimatedStyle, withTiming, withDelay, withSpring, withSequence,
+  withRepeat, interpolateColor, Easing,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -54,6 +56,195 @@ function Stepper({ current }: { current: Step }) {
         );
       })}
     </View>
+  );
+}
+
+// ── Pricing flow (animated) ─────────────────────────────────────────────
+// Explains "Card Price" vs "Wallet Value" visually: money moving from the
+// customer's payment into their store wallet, with the gap between the two
+// being the bonus that makes the card worth buying.
+
+const AnimatedText = Animated.createAnimatedComponent(Text);
+
+function FlowAmount({ value, color }: { value: number; color: string }) {
+  const pop = useSharedValue(1);
+  useEffect(() => {
+    pop.value = withSequence(
+      withTiming(1.14, { duration: 110, easing: Easing.out(Easing.quad) }),
+      withSpring(1, { damping: 8, stiffness: 200 }),
+    );
+  }, [value]);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }));
+  return (
+    <AnimatedText style={[ss.flowStepValue, { color }, style]}>
+      {value > 0 ? `₹${value}` : '—'}
+    </AnimatedText>
+  );
+}
+
+function FlowConnector() {
+  const travel = useSharedValue(0);
+  useEffect(() => {
+    travel.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1100, easing: Easing.inOut(Easing.quad) }),
+        withTiming(0, { duration: 0 }),
+      ),
+      -1,
+    );
+  }, []);
+  const dotStyle = useAnimatedStyle(() => ({
+    opacity: 0.15 + Math.sin(travel.value * Math.PI) * 0.85,
+    transform: [{ translateX: travel.value * 30 - 15 }],
+  }));
+  return (
+    <View style={ss.flowTrack}>
+      <View style={ss.flowTrackLine} />
+      <Animated.View style={[ss.flowTrackDot, dotStyle]} />
+      <Ionicons name="chevron-forward" size={14} color={DS.text3} style={{ marginLeft: 2 }} />
+    </View>
+  );
+}
+
+function PricingFlow({ price, wallet, bonus, bonusOk }: {
+  price: number; wallet: number; bonus: number; bonusOk: boolean;
+}) {
+  const enter = useSharedValue(0);
+  useEffect(() => {
+    enter.value = withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) });
+  }, []);
+  const cardStyle = useAnimatedStyle(() => ({
+    opacity: enter.value,
+    transform: [{ translateY: (1 - enter.value) * 12 }],
+  }));
+
+  const showResult = price > 0 && wallet > 0;
+
+  return (
+    <Animated.View style={[ss.flowCard, cardStyle]}>
+      <LinearGradient
+        colors={[DS.primarySoft, DS.bg]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={ss.flowRow}>
+        <View style={ss.flowStep}>
+          <View style={ss.flowIconWrap}>
+            <Ionicons name="cash-outline" size={16} color={DS.text2} />
+          </View>
+          <Text style={ss.flowStepLabel}>CUSTOMER PAYS</Text>
+          <FlowAmount value={price} color={DS.text} />
+        </View>
+
+        <FlowConnector />
+
+        <View style={ss.flowStep}>
+          <View style={[ss.flowIconWrap, { backgroundColor: DS.primarySoft }]}>
+            <Ionicons name="wallet-outline" size={16} color={DS.primary} />
+          </View>
+          <Text style={ss.flowStepLabel}>THEY GET TO SPEND</Text>
+          <FlowAmount value={wallet} color={DS.primary} />
+        </View>
+      </View>
+
+      {showResult && <FlowBadge bonusOk={bonusOk} bonus={bonus} />}
+      {showResult && bonusOk && <WhyBonusExplainer price={price} />}
+    </Animated.View>
+  );
+}
+
+// Anticipates the vendor's natural objection ("if the card's worth ₹1000, why
+// sell it for ₹800 — aren't I losing money?"). Collapsed by default so it
+// doesn't clutter the screen; tap to reveal the reasoning.
+function WhyBonusExplainer({ price }: { price: number }) {
+  const [expanded, setExpanded] = useState(false);
+  const [measuredHeight, setMeasuredHeight] = useState(0);
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    progress.value = withTiming(expanded ? 1 : 0, { duration: 260, easing: Easing.out(Easing.cubic) });
+  }, [expanded]);
+
+  const bodyStyle = useAnimatedStyle(() => ({
+    height: progress.value * measuredHeight,
+    opacity: progress.value,
+  }));
+  const chevronStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${progress.value * 180}deg` }],
+  }));
+
+  const explainerText = (
+    <Text style={ss.whyBodyText}>
+      You're not really losing money — you're trading a small discount for repeat
+      visits. That wallet value gets redeemed in food at your own menu prices, which
+      usually costs far less to make than what's redeemed. Meanwhile you collect
+      ₹{price || 0} in cash today, and the customer keeps coming back until their
+      wallet runs out.
+    </Text>
+  );
+
+  return (
+    <View style={ss.whyWrap}>
+      <TouchableOpacity style={ss.whyToggle} onPress={() => setExpanded(e => !e)} activeOpacity={0.7}>
+        <Ionicons name="help-circle-outline" size={14} color={DS.text2} />
+        <Text style={ss.whyToggleText}>Why offer a bonus?</Text>
+        <Animated.View style={chevronStyle}>
+          <Ionicons name="chevron-down" size={14} color={DS.text3} />
+        </Animated.View>
+      </TouchableOpacity>
+
+      {/*
+       * A child laid out inside a height-0 animated parent gets its own
+       * measured height collapsed to 0 too (Yoga constrains it to the
+       * parent's box) — so onLayout inside the clipped container would
+       * always report 0 and the reveal could never grow past nothing.
+       * This invisible, absolutely-positioned probe renders the same
+       * content unconstrained purely to measure its natural height; the
+       * visible copy below just gets clipped to that measured value.
+       */}
+      <View style={ss.whyBodyProbe} pointerEvents="none">
+        <View style={ss.whyBody} onLayout={e => setMeasuredHeight(e.nativeEvent.layout.height)}>
+          {explainerText}
+        </View>
+      </View>
+
+      <Animated.View style={[ss.whyBodyClip, bodyStyle]}>
+        <View style={ss.whyBody}>{explainerText}</View>
+      </Animated.View>
+    </View>
+  );
+}
+
+function FlowBadge({ bonusOk, bonus }: { bonusOk: boolean; bonus: number }) {
+  const pop = useSharedValue(0);
+  const errT = useSharedValue(bonusOk ? 0 : 1);
+
+  useEffect(() => {
+    pop.value = withSpring(1, { damping: 11, stiffness: 170 });
+  }, []);
+  useEffect(() => {
+    errT.value = withTiming(bonusOk ? 0 : 1, { duration: 220 });
+  }, [bonusOk]);
+
+  const style = useAnimatedStyle(() => ({
+    opacity: pop.value,
+    transform: [{ scale: 0.7 + pop.value * 0.3 }],
+    backgroundColor: interpolateColor(errT.value, [0, 1], [DS.successSoft, DS.primarySoft]),
+  }));
+  const textStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(errT.value, [0, 1], [DS.success, DS.primary]),
+  }));
+
+  return (
+    <Animated.View style={[ss.flowBadge, style]}>
+      <Ionicons name={bonusOk ? 'sparkles' : 'warning'} size={13} color={bonusOk ? DS.success : DS.primary} />
+      <AnimatedText style={[ss.flowBadgeText, textStyle]}>
+        {bonusOk
+          ? `+₹${bonus.toFixed(0)} bonus — this is what makes the card worth buying`
+          : 'Wallet value must be higher than the card price'}
+      </AnimatedText>
+    </Animated.View>
   );
 }
 
@@ -184,7 +375,6 @@ export default function CardCreateScreen() {
   const [cardPrice, setCardPrice] = useState('');
   const [walletAmt, setWalletAmt] = useState('');
   const [validity, setValidity]   = useState('');
-  const [imageUrl, setImageUrl]   = useState('');
 
   // Step 2 — categories
   const [selectedCatIds, setSelCatIds] = useState<number[]>([]);
@@ -312,7 +502,6 @@ export default function CardCreateScreen() {
       cardPrice:          price,
       walletAmount:       wallet,
       validityInDays:     days,
-      imageUrl:           imageUrl.trim() || undefined,
       categoryIds:        selectedCatIds,
       eligibleMenuItemIds: selectedItemIds.length > 0 ? selectedItemIds : undefined,
     };
@@ -382,9 +571,13 @@ export default function CardCreateScreen() {
         <>
           <View style={ss.sCard}>
             <Text style={ss.sTitle}>PRICING</Text>
+
+            <PricingFlow price={price} wallet={wallet} bonus={bonus} bonusOk={bonusOk} />
+
             <View style={ss.row}>
               <View style={{ flex: 1 }}>
                 <Text style={ss.label}>Card Price (₹) *</Text>
+                <Text style={ss.subLabel}>What the customer pays you</Text>
                 <TextInput
                   style={ss.input}
                   value={cardPrice}
@@ -396,6 +589,7 @@ export default function CardCreateScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={ss.label}>Wallet Value (₹) *</Text>
+                <Text style={ss.subLabel}>What they can spend in return</Text>
                 <TextInput
                   style={[ss.input, wallet > 0 && !bonusOk && ss.inputErr]}
                   value={walletAmt}
@@ -406,21 +600,6 @@ export default function CardCreateScreen() {
                 />
               </View>
             </View>
-
-            {price > 0 && wallet > 0 && (
-              <View style={[ss.bonusBanner, bonusOk ? ss.bonusOk : ss.bonusErr]}>
-                <Ionicons
-                  name={bonusOk ? 'trending-up-outline' : 'warning-outline'}
-                  size={15}
-                  color={bonusOk ? DS.success : DS.primary}
-                />
-                <Text style={[ss.bonusText, { color: bonusOk ? DS.success : DS.primary }]}>
-                  {bonusOk
-                    ? `Customer gets +₹${bonus.toFixed(0)} bonus value`
-                    : 'Wallet value must exceed card price'}
-                </Text>
-              </View>
-            )}
 
             <View style={ss.field}>
               <Text style={ss.label}>Validity (days) *</Text>
@@ -458,18 +637,6 @@ export default function CardCreateScreen() {
                 multiline
                 numberOfLines={3}
                 textAlignVertical="top"
-              />
-            </View>
-            <View>
-              <Text style={ss.label}>Image URL (optional)</Text>
-              <TextInput
-                style={ss.input}
-                value={imageUrl}
-                onChangeText={setImageUrl}
-                placeholder="https://…"
-                placeholderTextColor={DS.text3}
-                autoCapitalize="none"
-                keyboardType="url"
               />
             </View>
           </View>
@@ -875,8 +1042,53 @@ const ss = StyleSheet.create({
   row:   { flexDirection: 'row', gap: 12, marginBottom: 14 },
   field: { marginBottom: 14 },
 
+  // Pricing "how it works" preview (animated)
+  flowCard: {
+    borderRadius: 16, overflow: 'hidden',
+    borderWidth: 1, borderColor: '#F6D9CE',
+    padding: 16, marginBottom: 16,
+  },
+  flowRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  flowStep: { flex: 1, alignItems: 'center', gap: 6 },
+  flowIconWrap: {
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: DS.surface,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  flowStepLabel: { fontSize: 10, fontWeight: '700', color: DS.text3, letterSpacing: 0.5 },
+  flowStepValue: { fontSize: 20, fontWeight: '800', color: DS.text },
+
+  flowTrack: {
+    flexDirection: 'row', alignItems: 'center',
+    height: 32, paddingHorizontal: 4, width: 46,
+  },
+  flowTrackLine: {
+    position: 'absolute', left: 0, right: 10, top: '50%',
+    height: 2, backgroundColor: '#F0C9B8', borderRadius: 1,
+  },
+  flowTrackDot: {
+    position: 'absolute', left: 0, top: '50%', marginTop: -3,
+    width: 6, height: 6, borderRadius: 3, backgroundColor: DS.primary,
+  },
+
+  flowBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderRadius: 10, padding: 12, marginTop: 14,
+  },
+  flowBadgeText: { fontSize: 13, fontWeight: '600', flex: 1 },
+
+  // "Why offer a bonus?" disclosure
+  whyWrap:   { marginTop: 10 },
+  whyToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
+  whyToggleText: { fontSize: 12, fontWeight: '600', color: DS.text2, flex: 1 },
+  whyBodyProbe: { position: 'absolute', left: 0, right: 0, top: 0, opacity: 0 },
+  whyBodyClip:  { overflow: 'hidden' },
+  whyBody:      { paddingTop: 8, paddingRight: 4 },
+  whyBodyText:  { fontSize: 12.5, color: DS.text2, lineHeight: 18 },
+
   // Inputs
-  label: { fontSize: 12, fontWeight: '600', color: DS.text2, marginBottom: 7 },
+  label:    { fontSize: 12, fontWeight: '600', color: DS.text2, marginBottom: 7 },
+  subLabel: { fontSize: 11, color: DS.text3, marginTop: -5, marginBottom: 7 },
   input: {
     backgroundColor: DS.bg, borderWidth: 1, borderColor: DS.border,
     borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12,
@@ -884,12 +1096,6 @@ const ss = StyleSheet.create({
   },
   inputErr:   { borderColor: DS.primary },
   inputMulti: { height: 80, paddingTop: 12, textAlignVertical: 'top' },
-
-  // Bonus banner
-  bonusBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, padding: 12, marginBottom: 14 },
-  bonusOk:     { backgroundColor: DS.successSoft },
-  bonusErr:    { backgroundColor: DS.primarySoft },
-  bonusText:   { fontSize: 13, fontWeight: '600', flex: 1 },
 
   // Category chips
   chipGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

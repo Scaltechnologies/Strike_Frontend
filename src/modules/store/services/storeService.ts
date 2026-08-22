@@ -4,6 +4,7 @@ import axiosInstance, { BASE_URL } from '../../../core/api/axiosInstance';
 import { getAccessToken } from '../../../core/storage/secureStorage';
 import { ApiResponse } from '../../../core/types/api.types';
 import endpoints from '../../../core/api/endpoints';
+import { uploadFile } from '../../../core/api/fileUpload';
 import {
   StoreResponse,
   StoreDetailsRequest,
@@ -36,45 +37,22 @@ export async function updateStoreLocation(payload: UpdateStoreLocationRequest): 
 }
 
 // POST /api/vendor/stores/my/banner — multipart upload, field name "file".
-//
-// Deliberately bypasses axiosInstance/axios here and uses the raw fetch API.
-// Axios's FormData handling in React Native goes through header-merging logic
-// (instance defaults + per-call overrides + its own transformRequest) that is
-// easy to get subtly wrong — no combination of explicit Content-Type overrides
-// reliably produced a request the backend could parse. fetch's RN implementation
-// detects a FormData body natively and always generates the correct
-// `multipart/form-data; boundary=…` header itself, with no header gymnastics
-// required, so upload this one endpoint through fetch instead.
+// Uses expo-file-system's native uploadAsync — see fileUpload.ts for why
+// fetch()+FormData()+Blob doesn't work in this app's RN environment.
 export async function uploadStoreBanner(localUri: string): Promise<StoreResponse> {
-  const filename = localUri.split('/').pop() || `banner-${Date.now()}.jpg`;
-  const match = /\.(\w+)$/.exec(filename);
-  const ext = match ? match[1].toLowerCase() : 'jpg';
-  const mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-
-  const formData = new FormData();
-  formData.append('file', {
-    uri: localUri,
-    name: filename,
-    type: mimeType,
-  } as any);
-
   const token = await getAccessToken();
   const url = `${BASE_URL}${endpoints.store.myBanner}`;
 
-  let res: globalThis.Response;
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      body: formData as any,
-    });
-  } catch {
-    throw new Error(`No response from server. Check BASE_URL (${BASE_URL}) and that the backend is running.`);
+  const res = await uploadFile(url, localUri, 'file', token);
+
+  const body: ApiResponse<StoreResponse> | null = (() => {
+    try { return JSON.parse(res.body); } catch { return null; }
+  })();
+
+  if (res.status === 413) {
+    throw new Error('That photo is too large for the server to accept — please pick a different one.');
   }
-
-  const body: ApiResponse<StoreResponse> | null = await res.json().catch(() => null);
-
-  if (!res.ok) {
+  if (res.status < 200 || res.status >= 300) {
     const message = body?.message || `HTTP ${res.status}`;
     const apiError = new Error(`[${res.status}] ${endpoints.store.myBanner} — ${message}`) as Error & { status?: number };
     apiError.status = res.status;

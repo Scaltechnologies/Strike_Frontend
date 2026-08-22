@@ -14,6 +14,8 @@ import { getWithdrawalStats } from '../../../modules/wallet/services/walletServi
 import axiosInstance from '../../../core/api/axiosInstance';
 import endpoints from '../../../core/api/endpoints';
 import { getUserMessage } from '../../../core/api/errorMessage';
+import { SkeletonBlock } from '../../../components/Skeleton';
+import FadeIn from '../../../components/FadeIn';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -81,12 +83,12 @@ function SkeletonRow() {
   return (
     <View style={styles.txCard}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#E8EAED' }} />
+        <SkeletonBlock w={44} h={44} radius={12} />
         <View style={{ flex: 1, gap: 8 }}>
-          <View style={{ width: '55%', height: 12, borderRadius: 6, backgroundColor: '#E8EAED' }} />
-          <View style={{ width: '35%', height: 10, borderRadius: 6, backgroundColor: '#E8EAED' }} />
+          <SkeletonBlock w="55%" h={12} radius={6} />
+          <SkeletonBlock w="35%" h={10} radius={6} />
         </View>
-        <View style={{ width: 56, height: 14, borderRadius: 6, backgroundColor: '#E8EAED' }} />
+        <SkeletonBlock w={56} h={14} radius={6} />
       </View>
     </View>
   );
@@ -332,14 +334,14 @@ export default function TransactionsScreen() {
             {Array(6).fill(0).map((_, i) => <SkeletonRow key={i} />)}
           </View>
         ) : error ? (
-          <View style={styles.emptyWrap}>
+          <FadeIn style={styles.emptyWrap}>
             <Ionicons name="cloud-offline-outline" size={48} color={DS.text3} />
             <Text style={styles.emptyTitle}>Could not load transactions</Text>
             <Text style={styles.emptyDesc}>{error}</Text>
             <TouchableOpacity style={styles.retryBtn} onPress={() => load()}>
               <Text style={styles.retryText}>Try Again</Text>
             </TouchableOpacity>
-          </View>
+          </FadeIn>
         ) : (
           <FlatList
             data={listData}

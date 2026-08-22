@@ -4,23 +4,27 @@
 // whether/when to upload it (registration defers upload until the vendor is
 // authenticated; Store Settings uploads immediately).
 
-import { useState } from 'react';
-import { View, TouchableOpacity, Image, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, TouchableOpacity, Image, StyleSheet, ActivityIndicator, Alert, Animated } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Text from '../../../components/Text';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 
-// Modern phone cameras produce multi-MB, multi-thousand-pixel-wide photos —
-// far more than a banner needs. Downscaling client-side keeps the upload
-// small enough to finish reliably on slow connections and stay under the
-// backend's request-size limit.
-const MAX_BANNER_WIDTH = 1280;
+// A banner is shown at moderate on-screen size, never full camera resolution —
+// downscaling client-side keeps the upload small enough to finish reliably on
+// slow connections and stay under the backend's ~1MB request-body limit
+// (confirmed against the live API — a request over that can have its
+// connection dropped mid-upload, which surfaces as a bare network failure
+// rather than a clean error).
+const MAX_BANNER_WIDTH = 960;
 
 const DS = {
   bg:      '#F6F7FA',
   border:  '#EAECEF',
   primary: '#CC2200',
+  primarySoft: '#FFF0EE',
   text2:   '#5A6272',
   text3:   '#9BA3AF',
 };
@@ -35,6 +39,14 @@ interface BannerPickerProps {
 
 export default function BannerPicker({ uri, onPick, onRemove, uploading, label }: BannerPickerProps) {
   const [requesting, setRequesting] = useState(false);
+  const fade = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (uri) {
+      fade.setValue(0);
+      Animated.timing(fade, { toValue: 1, duration: 260, useNativeDriver: true }).start();
+    }
+  }, [uri, fade]);
 
   const pick = async () => {
     if (uploading || requesting) return;
@@ -53,16 +65,15 @@ export default function BannerPicker({ uri, onPick, onRemove, uploading, label }
       });
       if (!result.canceled && result.assets?.[0]?.uri) {
         const asset = result.assets[0];
-        // ImagePicker's `quality` only controls JPEG compression — a photo straight
-        // off a modern camera can still be several thousand pixels wide. Downscale
-        // it here so the upload stays small and finishes reliably.
-        const actions = asset.width > MAX_BANNER_WIDTH
-          ? [{ resize: { width: MAX_BANNER_WIDTH } }]
-          : [];
+        // Always resize (not just when already above the cap) — a busy,
+        // detailed photo can still produce a large JPEG even at a modest
+        // resolution, so re-encoding at a controlled quality every time
+        // keeps the upload size predictable.
+        const targetWidth = Math.min(asset.width, MAX_BANNER_WIDTH);
         const manipulated = await ImageManipulator.manipulateAsync(
           asset.uri,
-          actions,
-          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG },
+          [{ resize: { width: targetWidth } }],
+          { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG },
         );
         onPick(manipulated.uri);
       }
@@ -83,17 +94,28 @@ export default function BannerPicker({ uri, onPick, onRemove, uploading, label }
         disabled={uploading || requesting}
       >
         {uri ? (
-          <Image source={{ uri }} style={styles.image} resizeMode="cover" />
+          <>
+            <Animated.Image source={{ uri }} style={[styles.image, { opacity: fade }]} resizeMode="cover" />
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.45)']}
+              style={styles.imageShade}
+              pointerEvents="none"
+            />
+          </>
         ) : (
           <View style={styles.placeholder}>
-            <Ionicons name="image-outline" size={28} color={DS.text3} />
-            <Text style={styles.placeholderText}>Add Store Banner</Text>
+            <View style={styles.placeholderIconWrap}>
+              <Ionicons name="image-outline" size={22} color={DS.primary} />
+            </View>
+            <Text style={styles.placeholderTitle}>Add Store Banner</Text>
+            <Text style={styles.placeholderSub}>The first thing customers see</Text>
           </View>
         )}
 
         {(uploading || requesting) && (
           <View style={styles.overlay}>
             <ActivityIndicator color="#fff" />
+            <Text style={styles.overlayText}>{uploading ? 'Uploading…' : 'Opening gallery…'}</Text>
           </View>
         )}
 
@@ -119,7 +141,7 @@ const styles = StyleSheet.create({
   banner: {
     width: '100%',
     aspectRatio: 16 / 9,
-    borderRadius: 14,
+    borderRadius: 16,
     backgroundColor: DS.bg,
     borderWidth: 1.5,
     borderColor: DS.border,
@@ -127,22 +149,42 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   image: { width: '100%', height: '100%' },
-  placeholder: { alignItems: 'center', justifyContent: 'center', gap: 6 },
-  placeholderText: { fontSize: 13, fontWeight: '600', color: DS.text3 },
+  imageShade: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: '45%',
+  },
+  placeholder: { alignItems: 'center', justifyContent: 'center', gap: 5 },
+  placeholderIconWrap: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: DS.primarySoft,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 4,
+  },
+  placeholderTitle: { fontSize: 14, fontWeight: '700', color: DS.text2 },
+  placeholderSub:   { fontSize: 12, color: DS.text3 },
   overlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
   },
+  overlayText: { fontSize: 12, fontWeight: '600', color: '#fff' },
   editBadge: {
     position: 'absolute', right: 10, bottom: 10,
-    width: 30, height: 30, borderRadius: 15,
+    width: 32, height: 32, borderRadius: 16,
     backgroundColor: DS.primary,
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25, shadowRadius: 4, elevation: 4,
   },
   removeRow: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', marginTop: 8 },
   removeText: { fontSize: 12, fontWeight: '600', color: DS.primary },

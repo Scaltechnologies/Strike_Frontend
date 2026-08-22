@@ -138,6 +138,20 @@ axiosInstance.interceptors.response.use(
     }
 
     if (error.request) {
+      // A GET never mutates anything, so it's always safe to retry a bare
+      // connection failure (mobile networks routinely drop a request for a
+      // moment during a WiFi/cellular handoff) — this is what "no response
+      // from server" actually meant most of the time in practice, not a
+      // dead backend. POST/PUT/PATCH/DELETE are NOT retried here since
+      // silently re-sending a mutation could duplicate it.
+      const method = (originalRequest?.method ?? '').toLowerCase();
+      const retries = originalRequest?._networkRetries ?? 0;
+      if (method === 'get' && retries < 2) {
+        originalRequest._networkRetries = retries + 1;
+        await new Promise(resolve => setTimeout(resolve, 400 * (retries + 1)));
+        return axiosInstance(originalRequest);
+      }
+
       return Promise.reject(
         new Error(
           `No response from server. Check BASE_URL (${BASE_URL}) and that the backend is running.`,

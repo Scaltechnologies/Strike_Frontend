@@ -138,19 +138,29 @@ function Stepper({ value, onInc, onDec, fmt }: {
 // ── Sub-component: Timing Modal ────────────────────────────────────────────
 
 interface TimingState {
-  day: DayOfWeek;
-  existing: StoreTimingResponse | null;
+  days: DayOfWeek[];
   isClosed: boolean;
   openH: number; openM: number;
   closeH: number; closeM: number;
 }
 
-function TimingModal({ state, onClose, onSave, onRemove, saving }: {
+const WEEKDAYS: DayOfWeek[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'];
+const WEEKENDS: DayOfWeek[] = ['SATURDAY', 'SUNDAY'];
+
+function sameDaySet(a: DayOfWeek[], b: DayOfWeek[]): boolean {
+  return a.length === b.length && a.every(d => b.includes(d));
+}
+
+function TimingModal({ state, hasExisting, onClose, onSave, onRemove, saving, progress }: {
   state: TimingState;
+  // Whether a saved timing already exists for the (single) day this modal opened
+  // for — controls whether the "remove" affordance is offered at all.
+  hasExisting: boolean;
   onClose: () => void;
   onSave: (s: TimingState) => void;
-  onRemove: (s: TimingState) => void;
+  onRemove: () => void;
   saving: boolean;
+  progress: { done: number; total: number } | null;
 }) {
   const [local, setLocal] = useState<TimingState>(state);
   const set = (patch: Partial<TimingState>) => setLocal(p => ({ ...p, ...patch }));
@@ -159,14 +169,71 @@ function TimingModal({ state, onClose, onSave, onRemove, saving }: {
   const prevMin = (m: number) => MINS[(MINS.indexOf(m) - 1 + MINS.length) % MINS.length];
   const pad = (v: number) => String(v).padStart(2, '0');
 
+  const toggleDay = (day: DayOfWeek) => {
+    set({
+      days: local.days.includes(day)
+        ? local.days.filter(d => d !== day)
+        : [...local.days, day],
+    });
+  };
+
+  const dayCount = local.days.length;
+
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
         <View style={styles.modalSheet}>
           <View style={styles.modalHandle} />
-          <Text style={styles.modalTitle}>{DAY_FULL[local.day]}</Text>
-          <Text style={styles.modalSub}>Set operating hours for this day</Text>
+          <Text style={styles.modalTitle}>
+            {dayCount === 1 ? DAY_FULL[local.days[0]] : dayCount === 7 ? 'Every Day' : `${dayCount} Days`}
+          </Text>
+          <Text style={styles.modalSub}>
+            {dayCount <= 1
+              ? 'Set operating hours for this day, or select more days below to apply the same hours everywhere.'
+              : 'These hours will be applied to every day selected below.'}
+          </Text>
+
+          {/* Day picker — set once, apply to as many days as needed */}
+          <View style={styles.dayPickerWrap}>
+            <View style={styles.dayChipRow}>
+              {DAYS.map(day => {
+                const active = local.days.includes(day);
+                return (
+                  <TouchableOpacity
+                    key={day}
+                    onPress={() => toggleDay(day)}
+                    style={[styles.dayChip, active && styles.dayChipActive]}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.dayChipText, active && styles.dayChipTextActive]}>
+                      {DAY_SHORT[day].slice(0, 2)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={styles.dayPresetRow}>
+              {(
+                [
+                  { label: 'All days',  days: DAYS },
+                  { label: 'Weekdays',  days: WEEKDAYS },
+                  { label: 'Weekends',  days: WEEKENDS },
+                ] as const
+              ).map(p => (
+                <TouchableOpacity
+                  key={p.label}
+                  onPress={() => set({ days: p.days.slice() })}
+                  style={[styles.dayPresetBtn, sameDaySet(local.days, p.days as DayOfWeek[]) && styles.dayPresetBtnActive]}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.dayPresetText, sameDaySet(local.days, p.days as DayOfWeek[]) && styles.dayPresetTextActive]}>
+                    {p.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
 
           {/* Open / Closed toggle */}
           <View style={styles.toggleRow}>
@@ -214,10 +281,10 @@ function TimingModal({ state, onClose, onSave, onRemove, saving }: {
           )}
 
           <View style={styles.modalActions}>
-            {local.existing && (
+            {dayCount === 1 && hasExisting && (
               <TouchableOpacity
                 style={styles.removeBtn}
-                onPress={() => onRemove(local)}
+                onPress={onRemove}
                 disabled={saving}
                 activeOpacity={0.7}
               >
@@ -228,14 +295,23 @@ function TimingModal({ state, onClose, onSave, onRemove, saving }: {
               <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.saveBtn, saving && { opacity: 0.6 }]}
-              onPress={() => onSave(local)}
-              disabled={saving}
+              style={[styles.saveBtn, (saving || dayCount === 0) && { opacity: 0.6 }]}
+              onPress={() => dayCount > 0 && onSave(local)}
+              disabled={saving || dayCount === 0}
               activeOpacity={0.85}
             >
               {saving
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={styles.saveBtnText}>Save</Text>
+                ? (
+                  <>
+                    <ActivityIndicator size="small" color="#fff" />
+                    {progress && (
+                      <Text style={styles.saveBtnText}>Saving {progress.done}/{progress.total}…</Text>
+                    )}
+                  </>
+                )
+                : <Text style={styles.saveBtnText}>
+                    {dayCount === 0 ? 'Select a day' : dayCount === 1 ? 'Save' : `Save to ${dayCount} Days`}
+                  </Text>
               }
             </TouchableOpacity>
           </View>
@@ -348,6 +424,7 @@ export default function StoreSettingsScreen() {
   // ── Timings
   const [timingModal, setTimingModal]   = useState<TimingState | null>(null);
   const [savingTiming, setSavingTiming] = useState(false);
+  const [savingProgress, setSavingProgress] = useState<{ done: number; total: number } | null>(null);
 
   // ── Holidays
   const [showHolidayModal, setShowHolidayModal]     = useState(false);
@@ -447,55 +524,85 @@ export default function StoreSettingsScreen() {
     const op = parseTime(existing?.openTime ?? null);
     const cl = parseTime(existing?.closeTime ?? '21:00');
     setTimingModal({
-      day, existing,
+      days: [day],
       isClosed: existing?.isClosed ?? false,
       openH: op.h, openM: op.m,
       closeH: existing ? cl.h : 21, closeM: cl.m,
     });
   };
 
-  const saveTiming = async (s: TimingState) => {
-    if (!store) return;
-    setSavingTiming(true);
-    try {
-      const payload = {
-        dayOfWeek: s.day,
-        isClosed: s.isClosed,
-        // Always send null (not omit) so Spring Boot doesn't NPE on absent fields
-        openTime: s.isClosed ? null : fmtTime(s.openH, s.openM),
-        closeTime: s.isClosed ? null : fmtTime(s.closeH, s.closeM),
-      };
+  // Entry point for the "Set Weekly Hours" shortcut — opens the same modal
+  // with every day pre-selected, so setting up a typical week (same hours
+  // every day) takes one Save instead of seven.
+  const openBulkTimingModal = () => {
+    setTimingModal({
+      days: [...DAYS],
+      isClosed: false,
+      openH: 9, openM: 0,
+      closeH: 21, closeM: 0,
+    });
+  };
 
-      // The backend's POST upsert may have a Hibernate LazyInitException
-      // (it loads store.timings lazily to check for duplicates → crashes).
-      // Workaround: if a timing already exists, DELETE it first so POST sees
-      // a clean slate and runs a simple INSERT with no lazy-load needed.
-      if (s.existing) {
-        await deleteStoreTiming(store.id, s.existing.id);
+  const saveTiming = async (s: TimingState) => {
+    if (!store || s.days.length === 0) return;
+    setSavingTiming(true);
+    setSavingProgress(s.days.length > 1 ? { done: 0, total: s.days.length } : null);
+    try {
+      // Sequential, not Promise.all: firing a burst of concurrent DELETE+POST
+      // pairs at the same store's timings collection (up to 2x days requests
+      // at once) overwhelmed the connection on a real device and surfaced as
+      // a bare network failure. One day at a time is slower but reliable —
+      // this is a settings screen, not a hot path.
+      for (let i = 0; i < s.days.length; i++) {
+        const day = s.days[i];
+        const existing = timingsMap[day] ?? null;
+        const payload = {
+          dayOfWeek: day,
+          isClosed: s.isClosed,
+          // Always send null (not omit) so Spring Boot doesn't NPE on absent fields
+          openTime: s.isClosed ? null : fmtTime(s.openH, s.openM),
+          closeTime: s.isClosed ? null : fmtTime(s.closeH, s.closeM),
+        };
+
+        // The backend's POST upsert may have a Hibernate LazyInitException
+        // (it loads store.timings lazily to check for duplicates → crashes).
+        // Workaround: if a timing already exists, DELETE it first so POST sees
+        // a clean slate and runs a simple INSERT with no lazy-load needed.
+        if (existing) {
+          await deleteStoreTiming(store.id, existing.id);
+        }
+        const result = await upsertStoreTiming(store.id, payload);
+
+        // Commit each day as it lands (not once at the end) so if a later day
+        // in the batch fails, the days that already saved aren't lost from
+        // the UI — and re-opening this same modal won't try to redo them.
+        setStore(prev => {
+          if (!prev) return prev;
+          const rest = (prev.timings ?? []).filter(t => t.dayOfWeek !== day);
+          return { ...prev, timings: [...rest, result] };
+        });
+        setSavingProgress(s.days.length > 1 ? { done: i + 1, total: s.days.length } : null);
       }
 
-      const updated = await upsertStoreTiming(store.id, payload);
-      setStore(prev => {
-        if (!prev) return prev;
-        const rest = (prev.timings ?? []).filter(t => t.dayOfWeek !== s.day);
-        return { ...prev, timings: [...rest, updated] };
-      });
       setTimingModal(null);
     } catch (e: any) {
       Alert.alert('Save Failed', e?.message ?? 'Could not save timing');
     } finally {
       setSavingTiming(false);
+      setSavingProgress(null);
     }
   };
 
-  const removeTiming = async (s: TimingState) => {
-    if (!store || !s.existing) return;
+  const removeTiming = async () => {
+    const day = timingModal?.days[0];
+    const existing = day ? timingsMap[day] : null;
+    if (!store || !existing) return;
     setSavingTiming(true);
     try {
-      await deleteStoreTiming(store.id, s.existing.id);
+      await deleteStoreTiming(store.id, existing.id);
       setStore(prev => {
         if (!prev) return prev;
-        return { ...prev, timings: (prev.timings ?? []).filter(t => t.id !== s.existing!.id) };
+        return { ...prev, timings: (prev.timings ?? []).filter(t => t.id !== existing.id) };
       });
       setTimingModal(null);
     } catch (e: any) {
@@ -746,6 +853,22 @@ export default function StoreSettingsScreen() {
             {/* ══ Operating Hours ══ */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Operating Hours</Text>
+
+              <TouchableOpacity
+                style={styles.bulkHoursCard}
+                onPress={openBulkTimingModal}
+                activeOpacity={0.8}
+              >
+                <View style={styles.bulkHoursIconWrap}>
+                  <Ionicons name="time-outline" size={20} color={DS.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.bulkHoursTitle}>Set Weekly Hours</Text>
+                  <Text style={styles.bulkHoursSub}>Apply the same hours to several days at once</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={DS.text3} />
+              </TouchableOpacity>
+
               <View style={styles.card}>
                 {DAYS.map((day, idx) => {
                   const t = timingsMap[day];
@@ -841,10 +964,12 @@ export default function StoreSettingsScreen() {
       {timingModal && (
         <TimingModal
           state={timingModal}
+          hasExisting={timingModal.days.length === 1 && !!timingsMap[timingModal.days[0]]}
           onClose={() => setTimingModal(null)}
           onSave={saveTiming}
           onRemove={removeTiming}
           saving={savingTiming}
+          progress={savingProgress}
         />
       )}
 
@@ -958,6 +1083,20 @@ const styles = StyleSheet.create({
   },
 
   // Operating hours
+  bulkHoursCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: DS.primarySoft, borderRadius: 16,
+    borderWidth: 1, borderColor: '#F6D9CE',
+    padding: 14, marginBottom: 10,
+  },
+  bulkHoursIconWrap: {
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: DS.surface,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  bulkHoursTitle: { fontSize: 14, fontWeight: '700', color: DS.text },
+  bulkHoursSub:   { fontSize: 12, color: DS.text2, marginTop: 2 },
+
   dayRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
   dayName:   { width: 38, fontSize: 14, fontWeight: '600', color: DS.text },
   dayRight:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
@@ -999,6 +1138,25 @@ const styles = StyleSheet.create({
   modalSub:   { fontSize: 13, color: DS.text2, textAlign: 'center', marginBottom: 20, lineHeight: 19 },
 
   // Timing-specific
+  dayPickerWrap: { width: '100%', marginBottom: 22, gap: 10 },
+  dayChipRow: { flexDirection: 'row', width: '100%', gap: 6 },
+  dayChip: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    height: 40, borderRadius: 12,
+    borderWidth: 1.5, borderColor: DS.border, backgroundColor: DS.bg,
+  },
+  dayChipActive:     { backgroundColor: DS.primary, borderColor: DS.primary },
+  dayChipText:       { fontSize: 12, fontWeight: '700', color: DS.text2 },
+  dayChipTextActive: { color: '#fff' },
+  dayPresetRow: { flexDirection: 'row', gap: 8, justifyContent: 'center' },
+  dayPresetBtn: {
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
+    borderWidth: 1, borderColor: DS.border, backgroundColor: DS.surface,
+  },
+  dayPresetBtnActive: { backgroundColor: DS.primarySoft, borderColor: '#F6D9CE' },
+  dayPresetText:       { fontSize: 12, fontWeight: '600', color: DS.text2 },
+  dayPresetTextActive: { color: DS.primary, fontWeight: '700' },
+
   toggleRow: {
     flexDirection: 'row', gap: 10, marginBottom: 24, width: '100%',
   },

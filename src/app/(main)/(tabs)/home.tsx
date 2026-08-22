@@ -5,6 +5,7 @@ import {
   useWindowDimensions, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import Text from '../../../components/Text';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
@@ -12,6 +13,8 @@ import { useRedemption } from '../../../modules/redemption/store/RedemptionConte
 import type { RedemptionRequest } from '../../../modules/redemption/services/redemptionService';
 import { resolveMediaUrl } from '../../../core/api/mediaUrl';
 import NotificationBell from '../../../modules/notifications/components/NotificationBell';
+import { SkeletonBlock } from '../../../components/Skeleton';
+import FadeIn from '../../../components/FadeIn';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -62,13 +65,9 @@ function formatRequestId(id: string): string {
 }
 
 // ─── Skeleton ────────────────────────────────────────────────────────
-function SkeletonBlock({ w, h, radius = 8 }: { w: number | string; h: number; radius?: number }) {
-  return <View style={{ width: w as number, height: h, borderRadius: radius, backgroundColor: '#E8EAED' }} />;
-}
-
 function SkeletonCard() {
   return (
-    <View style={styles.activeCard}>
+    <FadeIn style={styles.activeCard}>
       <SkeletonBlock w="40%" h={11} radius={6} />
       <View style={{ height: 12 }} />
       <SkeletonBlock w="60%" h={22} radius={8} />
@@ -83,7 +82,7 @@ function SkeletonCard() {
       <SkeletonBlock w="100%" h={50} radius={12} />
       <View style={{ height: 8 }} />
       <SkeletonBlock w="100%" h={40} radius={12} />
-    </View>
+    </FadeIn>
   );
 }
 
@@ -576,7 +575,11 @@ export default function HomeScreen() {
   const storeInitials = storeName.split(' ').slice(0, 2).map(w => w.charAt(0)).join('').toUpperCase() || 'S';
 
   return (
-    <View style={styles.root}>
+    <LinearGradient
+      colors={[DS.primarySoft, '#FFFFFF', DS.bg]}
+      locations={[0, 0.22, 1]}
+      style={styles.root}
+    >
       <StatusBar barStyle="dark-content" backgroundColor={DS.surface} />
 
       {/* Header */}
@@ -746,27 +749,29 @@ export default function HomeScreen() {
         visible={successVisible}
         onClose={() => setSuccessVisible(false)}
       />
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: DS.bg },
-  content: { flex: 1, backgroundColor: DS.bg },
+  root:    { flex: 1 },
+  content: { flex: 1, backgroundColor: 'transparent' },
 
-  // Header
+  // Header — a bright card floating over the tinted gradient background,
+  // so the seam into the content below reads as depth (shadow) rather than
+  // a hard line.
   header: {
     backgroundColor: DS.surface,
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 0,
-    borderBottomWidth: 1,
-    borderBottomColor: DS.border,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 4,
   },
   headerRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14,
