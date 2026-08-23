@@ -8,11 +8,14 @@ import Text from '../../components/Text';
 import TextInput from '../../components/TextInput';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getStoreSubscriptions } from '../../modules/cards/services/cardService';
+import { getStoreSubscriptions, getSubscriptionValidityDays } from '../../modules/cards/services/cardService';
 import type { SubscriptionResponse, SubscriptionStatus } from '../../modules/cards/types/card.types';
 import axiosInstance from '../../core/api/axiosInstance';
 import endpoints from '../../core/api/endpoints';
 import { getUserMessage } from '../../core/api/errorMessage';
+import WalletConsumptionGrid from '../../modules/cards/components/WalletConsumptionGrid';
+import { useRedemption } from '../../modules/redemption/store/RedemptionContext';
+import type { RedemptionRequest, RedemptionStatus } from '../../modules/redemption/services/redemptionService';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -30,6 +33,12 @@ const DS = {
   text2:       '#5A6272',
   text3:       '#9BA3AF',
 };
+
+// Ticket card layout: shared by ticketTop/ticketBottom's padding and the
+// notch math (a notch straddles the ticket's true edge by exactly half its
+// own diameter, so its clipped remainder reads as a bite out of the border).
+const TICKET_PAD    = 18;
+const TICKET_NOTCH  = 26;
 
 type Filter = 'all' | SubscriptionStatus;
 
@@ -139,6 +148,27 @@ function SubscriptionCard({ item, onPress }: { item: SubscriptionResponse; onPre
   );
 }
 
+function recordStatusColor(status: RedemptionStatus) {
+  if (status === 'completed') return DS.success;
+  if (status === 'pending')   return DS.warning;
+  return DS.error; // rejected / failed / reversed
+}
+
+function RecordRow({ record, last }: { record: RedemptionRequest; last: boolean }) {
+  return (
+    <View>
+      <View style={styles.recordRow}>
+        <View style={[styles.recordDot, { backgroundColor: recordStatusColor(record.status) }]} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.recordDate} numberOfLines={1}>{record.orderedAt}</Text>
+        </View>
+        <Text style={styles.recordAmount}>{formatCurrency(record.totalValue)}</Text>
+      </View>
+      {!last && <View style={styles.infoRowDivider} />}
+    </View>
+  );
+}
+
 function DetailRow({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
   return (
     <View style={styles.detailRow}>
@@ -149,9 +179,17 @@ function DetailRow({ label, value, valueColor }: { label: string; value: string;
 }
 
 function SubscriptionDetailModal({ item, onClose }: { item: SubscriptionResponse | null; onClose: () => void }) {
+  const { history } = useRedemption();
+
   if (!item) return null;
   const sc = statusStyle(item.status);
   const exp = expiryInfo(item);
+
+  const subHistory = history
+    .filter(r => r.subscriptionId === item.id)
+    .sort((a, b) => (a.createdAtRaw < b.createdAtRaw ? 1 : -1));
+  const hasConsumptionData = item.originalWalletAmount != null && item.consumptionPercentage != null;
+
   return (
     <Modal visible={!!item} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -159,44 +197,81 @@ function SubscriptionDetailModal({ item, onClose }: { item: SubscriptionResponse
         <View style={styles.modalSheet}>
           <View style={styles.modalHandle} />
 
-          <View style={styles.detailHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.detailHeaderLabel}>{item.cardName.toUpperCase()}</Text>
-              <Text style={styles.detailHeaderAmount}>{formatCurrency(item.walletBalance)}</Text>
-              <Text style={styles.detailHeaderSub}>Remaining balance</Text>
-            </View>
-            <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
-              <View style={[styles.dot, { backgroundColor: sc.fg }]} />
-              <Text style={[styles.statusText, { color: sc.fg }]}>{item.status}</Text>
-            </View>
-          </View>
-
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <View style={[styles.expiryBanner, { backgroundColor: exp.urgent ? exp.color + '18' : DS.bg }]}>
-              <Ionicons name={exp.urgent ? 'alert-circle' : 'time-outline'} size={18} color={exp.color} />
-              <Text style={[styles.expiryBannerText, { color: exp.color }]}>{exp.label}</Text>
-            </View>
+            {/* Ticket card — everything about this subscription in one
+                continuous stub, torn between "who/what" and "redemption
+                history" by a dashed perforation with true edge notches. */}
+            <View style={styles.ticketWrap}>
+              <View style={styles.ticketTop}>
+                <View style={styles.detailHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.detailHeaderLabel}>{item.cardName.toUpperCase()}</Text>
+                    <Text style={styles.detailHeaderAmount}>{formatCurrency(item.walletBalance)}</Text>
+                    <Text style={styles.detailHeaderSub}>Remaining balance</Text>
+                  </View>
+                  <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
+                    <View style={[styles.dot, { backgroundColor: sc.fg }]} />
+                    <Text style={[styles.statusText, { color: sc.fg }]}>{item.status}</Text>
+                  </View>
+                </View>
 
-            <View style={styles.detailCard}>
-              <Text style={styles.detailCardTitle}>CUSTOMER</Text>
-              <DetailRow label="Name" value={item.customerName ?? 'Customer'} />
-            </View>
+                <View style={[styles.expiryBanner, { backgroundColor: exp.urgent ? exp.color + '18' : DS.bg }]}>
+                  <Ionicons name={exp.urgent ? 'alert-circle' : 'time-outline'} size={18} color={exp.color} />
+                  <Text style={[styles.expiryBannerText, { color: exp.color }]}>{exp.label}</Text>
+                </View>
 
-            <View style={styles.detailCard}>
-              <Text style={styles.detailCardTitle}>PURCHASE INFO</Text>
-              <DetailRow label="Card Price" value={formatCurrency(item.originalAmount)} />
-              {item.discountApplied > 0 && (
-                <DetailRow label="Discount" value={`− ${formatCurrency(item.discountApplied)}`} valueColor={DS.success} />
-              )}
-              {!!item.couponCode && <DetailRow label="Coupon Used" value={item.couponCode} />}
-              <DetailRow label="Amount Paid" value={formatCurrency(item.finalAmount)} valueColor={DS.text} />
-              <DetailRow label="Purchased On" value={formatDate(item.purchasedAt)} />
-              <DetailRow
-                label="Expires On"
-                value={formatDate(item.expiresAt)}
-                valueColor={exp.urgent ? exp.color : undefined}
-              />
-              <DetailRow label="Subscription ID" value={`#${item.id}`} />
+                <View style={styles.ticketInfoBlock}>
+                  <Text style={styles.detailCardTitle}>CUSTOMER</Text>
+                  <DetailRow label="Name" value={item.customerName ?? 'Customer'} />
+                </View>
+
+                <View style={styles.ticketInfoBlock}>
+                  <Text style={styles.detailCardTitle}>PURCHASE INFO</Text>
+                  <DetailRow label="Card Price" value={formatCurrency(item.originalAmount)} />
+                  {item.discountApplied > 0 && (
+                    <DetailRow label="Discount" value={`− ${formatCurrency(item.discountApplied)}`} valueColor={DS.success} />
+                  )}
+                  {!!item.couponCode && <DetailRow label="Coupon Used" value={item.couponCode} />}
+                  <DetailRow label="Amount Paid" value={formatCurrency(item.finalAmount)} valueColor={DS.text} />
+                  <DetailRow label="Purchased On" value={formatDate(item.purchasedAt)} />
+                  <DetailRow
+                    label="Expires On"
+                    value={formatDate(item.expiresAt)}
+                    valueColor={exp.urgent ? exp.color : undefined}
+                  />
+                  <DetailRow label="Subscription ID" value={`#${item.id}`} />
+                </View>
+              </View>
+
+              <View style={styles.ticketDividerRow}>
+                <View style={styles.ticketNotch} />
+                <View style={styles.ticketDashedLine} />
+                <View style={styles.ticketNotch} />
+              </View>
+
+              <View style={styles.ticketBottom}>
+                <Text style={styles.detailCardTitle}>REDEMPTION HISTORY</Text>
+
+                {hasConsumptionData && (
+                  <View style={{ marginTop: 14, marginBottom: 18 }}>
+                    <WalletConsumptionGrid
+                      originalWalletAmount={item.originalWalletAmount}
+                      walletBalance={item.walletBalance}
+                      consumedAmount={item.consumedAmount}
+                      consumptionPercentage={item.consumptionPercentage}
+                      totalCells={getSubscriptionValidityDays(item)}
+                    />
+                  </View>
+                )}
+
+                {subHistory.length === 0 ? (
+                  <Text style={styles.noRecordsText}>No redemptions recorded yet</Text>
+                ) : (
+                  subHistory.slice(0, 5).map((r, idx) => (
+                    <RecordRow key={r.id} record={r} last={idx === Math.min(subHistory.length, 5) - 1} />
+                  ))
+                )}
+              </View>
             </View>
 
             <TouchableOpacity style={styles.detailCloseBtn} onPress={onClose} activeOpacity={0.85}>
@@ -222,6 +297,7 @@ export default function StoreSubscriptionsScreen() {
   const [filter, setFilter]         = useState<Filter>('all');
   const [search, setSearch]         = useState('');
   const [selectedSub, setSelectedSub] = useState<SubscriptionResponse | null>(null);
+  const { loadHistory } = useRedemption();
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
@@ -244,7 +320,10 @@ export default function StoreSubscriptionsScreen() {
     }
   }, [storeId]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  // loadHistory populates RedemptionContext's shared `history` (used below by
+  // the detail modal's per-subscription redemption records) — reused, not
+  // re-fetched separately, so this and the Redemptions tab stay in sync.
+  useFocusEffect(useCallback(() => { load(); loadHistory(); }, [load, loadHistory]));
 
   const filtered = subs.filter(s => {
     const matchFilter = filter === 'all' || s.status === filter;
@@ -465,10 +544,6 @@ const styles = StyleSheet.create({
   },
   expiryBannerText: { fontSize: 13, fontWeight: '700' },
 
-  detailCard: {
-    backgroundColor: DS.bg, borderRadius: 16, borderWidth: 1, borderColor: DS.border,
-    padding: 16, marginBottom: 14,
-  },
   detailCardTitle: {
     fontSize: 11, fontWeight: '700', color: DS.text3,
     letterSpacing: 1, marginBottom: 10, textTransform: 'uppercase',
@@ -479,6 +554,44 @@ const styles = StyleSheet.create({
   },
   detailLabel: { fontSize: 13, color: DS.text2 },
   detailValue: { fontSize: 13, fontWeight: '600', color: DS.text, textAlign: 'right', flex: 1 },
+
+  // Ticket card — one continuous stub wrapping everything about this
+  // subscription: identity/purchase info on top, redemption history on the
+  // bottom, torn apart by a dashed perforation with true edge notches (the
+  // notches are filled the same color as the ticket and straddle its outer
+  // border via negative margins, so `overflow:hidden` clips them into a
+  // clean half-circle "bite" out of the border line itself).
+  ticketWrap: {
+    backgroundColor: DS.surface, borderRadius: 20,
+    borderWidth: 1.5, borderColor: '#F5C6BC',
+    marginBottom: 14, overflow: 'hidden',
+  },
+  ticketTop:    { padding: TICKET_PAD },
+  ticketBottom: { padding: TICKET_PAD, paddingTop: 6 },
+  ticketInfoBlock: { marginTop: 14 },
+  ticketDividerRow: {
+    flexDirection: 'row', alignItems: 'center',
+  },
+  ticketNotch: {
+    width: TICKET_NOTCH, height: TICKET_NOTCH, borderRadius: TICKET_NOTCH / 2,
+    backgroundColor: DS.surface,
+    marginLeft: -TICKET_NOTCH / 2, marginRight: -TICKET_NOTCH / 2,
+  },
+  ticketDashedLine: {
+    flex: 1, height: 0,
+    borderTopWidth: 1.5, borderColor: '#F5C6BC', borderStyle: 'dashed',
+  },
+  noRecordsText: {
+    fontSize: 13, color: DS.text3, textAlign: 'center', paddingVertical: 16,
+  },
+  recordRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 11,
+  },
+  recordDot:    { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
+  recordDate:   { fontSize: 13, color: DS.text2, fontWeight: '500' },
+  recordAmount: { fontSize: 13, fontWeight: '700', color: DS.text },
+  infoRowDivider: { height: 1, backgroundColor: DS.border },
 
   detailCloseBtn: {
     alignItems: 'center', justifyContent: 'center',

@@ -25,10 +25,12 @@ export interface UseMenuReturn {
   refreshing: boolean;
   refresh: (isRefresh?: boolean) => Promise<void>;
   // Category CRUD
-  // imageUri is a local device file URI from the picker — pass it only when
-  // the vendor picked a new photo; omit it to leave the existing image untouched.
-  addCategory: (name: string, imageUri?: string) => Promise<void>;
-  editCategory: (id: number, name: string, imageUri?: string) => Promise<void>;
+  // Category image upload needs a categoryId, so it's always a separate call
+  // (setCategoryImage) made after the category itself already exists — never
+  // bundled into addCategory/editCategory.
+  addCategory: (name: string) => Promise<CategoryResponse>;
+  editCategory: (id: number, name: string) => Promise<CategoryResponse>;
+  setCategoryImage: (id: number, imageUri: string) => Promise<CategoryResponse>;
   removeCategory: (id: number) => Promise<void>;
   // Item CRUD
   toggleAvailability: (item: MenuItemResponse) => Promise<void>;
@@ -62,20 +64,22 @@ export function useMenu(): UseMenuReturn {
 
   // ── Category CRUD ──────────────────────────────────────────────────
 
-  const addCategory = useCallback(async (name: string, imageUri?: string) => {
-    let created = await createCategory({ name });
-    if (imageUri) {
-      created = await uploadCategoryImage(created.id, imageUri);
-    }
+  const addCategory = useCallback(async (name: string) => {
+    const created = await createCategory({ name });
     setCategories(prev => [...prev, created]);
+    return created;
   }, []);
 
-  const editCategory = useCallback(async (id: number, name: string, imageUri?: string) => {
-    let updated = await updateCategory(id, { name });
-    if (imageUri) {
-      updated = await uploadCategoryImage(id, imageUri);
-    }
+  const editCategory = useCallback(async (id: number, name: string) => {
+    const updated = await updateCategory(id, { name });
     setCategories(prev => prev.map(c => (c.id === id ? updated : c)));
+    return updated;
+  }, []);
+
+  const setCategoryImage = useCallback(async (id: number, imageUri: string) => {
+    const updated = await uploadCategoryImage(id, imageUri);
+    setCategories(prev => prev.map(c => (c.id === id ? updated : c)));
+    return updated;
   }, []);
 
   const removeCategory = useCallback(async (id: number) => {
@@ -129,6 +133,7 @@ export function useMenu(): UseMenuReturn {
     refresh,
     addCategory,
     editCategory,
+    setCategoryImage,
     removeCategory,
     toggleAvailability,
     addItem,

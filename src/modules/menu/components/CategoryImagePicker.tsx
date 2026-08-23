@@ -4,8 +4,8 @@
 // caller decides when to upload it (only after the category itself is saved,
 // since the upload endpoint needs a categoryId).
 
-import { useState } from 'react';
-import { View, TouchableOpacity, Image, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { useState, useRef, useEffect } from 'react';
+import { View, TouchableOpacity, Image, StyleSheet, ActivityIndicator, Alert, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Text from '../../../components/Text';
 import * as ImagePicker from 'expo-image-picker';
@@ -36,6 +36,25 @@ interface CategoryImagePickerProps {
 
 export default function CategoryImagePicker({ uri, onPick, uploading, size = 88 }: CategoryImagePickerProps) {
   const [requesting, setRequesting] = useState(false);
+  const press    = useRef(new Animated.Value(1)).current;
+  const badgePop = useRef(new Animated.Value(1)).current;
+
+  // Small celebratory "pop" on the badge whenever a photo is freshly picked,
+  // so the pick registers as an obvious success rather than a silent swap.
+  useEffect(() => {
+    if (uri) {
+      badgePop.setValue(0.4);
+      Animated.spring(badgePop, { toValue: 1, useNativeDriver: true, friction: 5, tension: 140 }).start();
+    }
+  }, [uri, badgePop]);
+
+  const handlePressIn = () => {
+    if (uploading || requesting) return;
+    Animated.spring(press, { toValue: 0.92, useNativeDriver: true, speed: 50, bounciness: 6 }).start();
+  };
+  const handlePressOut = () => {
+    Animated.spring(press, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 9 }).start();
+  };
 
   const pick = async () => {
     if (uploading || requesting) return;
@@ -76,32 +95,36 @@ export default function CategoryImagePicker({ uri, onPick, uploading, size = 88 
 
   return (
     <View style={styles.wrap}>
-      <TouchableOpacity
-        style={[styles.circle, dim]}
-        onPress={pick}
-        activeOpacity={0.85}
-        disabled={uploading || requesting}
-      >
-        {uri ? (
-          <Image source={{ uri }} style={[styles.image, dim]} resizeMode="cover" />
-        ) : (
-          <View style={[styles.placeholder, dim]}>
-            <Ionicons name="image-outline" size={size * 0.34} color={DS.text3} />
-          </View>
-        )}
+      <Animated.View style={{ transform: [{ scale: press }] }}>
+        <TouchableOpacity
+          style={[styles.circle, dim]}
+          onPress={pick}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          activeOpacity={0.85}
+          disabled={uploading || requesting}
+        >
+          {uri ? (
+            <Image source={{ uri }} style={[styles.image, dim]} resizeMode="cover" />
+          ) : (
+            <View style={[styles.placeholder, dim]}>
+              <Ionicons name="image-outline" size={size * 0.34} color={DS.text3} />
+            </View>
+          )}
 
-        {(uploading || requesting) && (
-          <View style={[styles.overlay, dim]}>
-            <ActivityIndicator color="#fff" />
-          </View>
-        )}
+          {(uploading || requesting) && (
+            <View style={[styles.overlay, dim]}>
+              <ActivityIndicator color="#fff" />
+            </View>
+          )}
 
-        {!uploading && !requesting && (
-          <View style={styles.editBadge}>
-            <Ionicons name={uri ? 'camera' : 'add'} size={13} color="#fff" />
-          </View>
-        )}
-      </TouchableOpacity>
+          {!uploading && !requesting && (
+            <Animated.View style={[styles.editBadge, { transform: [{ scale: badgePop }] }]}>
+              <Ionicons name={uri ? 'camera' : 'add'} size={13} color="#fff" />
+            </Animated.View>
+          )}
+        </TouchableOpacity>
+      </Animated.View>
 
       <Text style={styles.hint}>{uri ? 'Change photo' : 'Add category photo'}</Text>
     </View>
