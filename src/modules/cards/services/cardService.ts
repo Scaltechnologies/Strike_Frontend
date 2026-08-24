@@ -96,3 +96,15 @@ export async function getSubscription(subscriptionId: number): Promise<Subscript
   );
   return res.data.data;
 }
+
+// Wallet-grid box count for a subscription: one box per day of the card's
+// validity, derived from the subscription's own purchasedAt/expiresAt —
+// never from the live CardDefinition.validityInDays, which the vendor may
+// have since changed for new purchases. Falls back to 1 defensively so a
+// bad/missing timestamp never divides a wallet amount by zero.
+export function getSubscriptionValidityDays(sub: Pick<SubscriptionResponse, 'purchasedAt' | 'expiresAt'>): number {
+  const start = new Date(sub.purchasedAt).getTime();
+  const end = new Date(sub.expiresAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 1;
+  return Math.max(1, Math.round((end - start) / 86400000));
+}

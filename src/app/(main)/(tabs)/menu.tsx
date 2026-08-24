@@ -1,8 +1,8 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View, TouchableOpacity, FlatList, StyleSheet,
-  StatusBar, Switch, Image, Alert, Modal, ScrollView, Animated,
-  Platform, Keyboard, KeyboardAvoidingView, Share, RefreshControl,
+  StatusBar, Switch, Image, Modal, ScrollView, Animated, Easing,
+  Platform, KeyboardAvoidingView, Share, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
@@ -72,6 +72,182 @@ function useToast() {
   return { show, ToastView };
 }
 
+// ── App Alert (replaces the OS-native Alert.alert with a themed,
+//    animated dialog matching the rest of the screen) ───────────────────
+
+type AlertButton = { text: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void };
+type AlertConfig = { title: string; message?: string; buttons: AlertButton[] };
+
+function useAppAlert() {
+  const [config, setConfig]   = useState<AlertConfig | null>(null);
+  const [visible, setVisible] = useState(false);
+  const anim = useRef(new Animated.Value(0)).current;
+
+  const alert = useCallback((title: string, message?: string, buttons?: AlertButton[]) => {
+    setConfig({ title, message, buttons: buttons && buttons.length > 0 ? buttons : [{ text: 'OK' }] });
+    setVisible(true);
+  }, []);
+
+  useEffect(() => {
+    if (visible) {
+      anim.setValue(0);
+      Animated.spring(anim, { toValue: 1, useNativeDriver: true, friction: 8, tension: 70 }).start();
+    }
+  }, [visible, anim]);
+
+  // Deferred with setTimeout so a button's onPress (which may itself call
+  // `alert(...)` again, e.g. a "Delete" confirmation chained off an action
+  // sheet) fires *after* this dialog has actually unmounted, instead of
+  // being batched into the same render and skipping the close animation.
+  const close = useCallback((onPress?: () => void) => {
+    Animated.timing(anim, { toValue: 0, duration: 160, useNativeDriver: true }).start(() => {
+      setVisible(false);
+      setConfig(null);
+      if (onPress) setTimeout(onPress, 0);
+    });
+  }, [anim]);
+
+  const AlertView = useCallback(() => {
+    if (!config) return null;
+    const { title, message, buttons } = config;
+    const isList = buttons.length > 2;
+    const hasDestructive = buttons.some(b => b.style === 'destructive');
+    const isAlarming = hasDestructive || /error|required/i.test(title);
+
+    const iconName = hasDestructive ? 'trash-outline'
+      : /error/i.test(title) ? 'close-circle'
+      : /required/i.test(title) ? 'alert-circle'
+      : 'information-circle';
+
+    // Cancel-style buttons always render first (left/top) regardless of the
+    // order they were declared in — keeps every dialog reading consistently.
+    const rowButtons = [...buttons].sort(
+      (a, b) => (a.style === 'cancel' ? 0 : 1) - (b.style === 'cancel' ? 0 : 1),
+    );
+
+    const dismiss = () => close(buttons.find(b => b.style === 'cancel')?.onPress);
+
+    const overlayStyle = { opacity: anim };
+    const cardStyle = {
+      opacity: anim,
+      transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] }) }],
+    };
+
+    return (
+      <Modal visible={visible} transparent animationType="none" onRequestClose={dismiss}>
+        <View style={alertStyles.wrap}>
+          <Animated.View style={[StyleSheet.absoluteFill, alertStyles.overlay, overlayStyle]} />
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={dismiss} />
+
+          <Animated.View style={[alertStyles.card, cardStyle]}>
+            {!isList && (
+              <View style={[alertStyles.iconWrap, { backgroundColor: isAlarming ? DS.errorSoft : DS.primarySoft }]}>
+                <Ionicons name={iconName as any} size={22} color={isAlarming ? DS.error : DS.primary} />
+              </View>
+            )}
+            <Text style={alertStyles.title}>{title}</Text>
+            {!!message && <Text style={alertStyles.message}>{message}</Text>}
+
+            {isList ? (
+              <View style={alertStyles.listWrap}>
+                {buttons.map((b, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[alertStyles.listItem, idx < buttons.length - 1 && alertStyles.listItemBorder]}
+                    onPress={() => close(b.onPress)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[
+                      alertStyles.listItemText,
+                      b.style === 'destructive' && { color: DS.error },
+                      b.style === 'cancel' && { color: DS.text3, fontWeight: '600' },
+                    ]}>
+                      {b.text}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : buttons.length === 1 ? (
+              <TouchableOpacity style={alertStyles.singleBtn} onPress={() => close(buttons[0].onPress)} activeOpacity={0.88}>
+                <Text style={alertStyles.singleBtnText}>{buttons[0].text}</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={alertStyles.row}>
+                {rowButtons.map((b, idx) => {
+                  const primary = b.style !== 'cancel';
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      style={[
+                        alertStyles.rowBtn,
+                        primary
+                          ? (b.style === 'destructive' ? alertStyles.rowBtnDanger : alertStyles.rowBtnPrimary)
+                          : alertStyles.rowBtnGhost,
+                      ]}
+                      onPress={() => close(b.onPress)}
+                      activeOpacity={0.88}
+                    >
+                      <Text style={[alertStyles.rowBtnText, { color: primary ? '#fff' : DS.text2 }]}>
+                        {b.text}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </Animated.View>
+        </View>
+      </Modal>
+    );
+  }, [config, visible, anim, close]);
+
+  return { alert, AlertView };
+}
+
+const alertStyles = StyleSheet.create({
+  wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
+  overlay: { backgroundColor: 'rgba(10,10,12,0.55)' },
+  card: {
+    width: '100%', maxWidth: 340,
+    backgroundColor: DS.surface, borderRadius: 22,
+    paddingTop: 24, paddingHorizontal: 22, paddingBottom: 18,
+    alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.2, shadowRadius: 28, elevation: 16,
+  },
+  iconWrap: {
+    width: 48, height: 48, borderRadius: 24,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+  },
+  title:   { fontSize: 17, fontWeight: '800', color: DS.text, textAlign: 'center' },
+  message: {
+    fontSize: 13.5, color: DS.text2, textAlign: 'center',
+    lineHeight: 20, marginTop: 8,
+  },
+
+  row:     { flexDirection: 'row', gap: 10, marginTop: 20, width: '100%' },
+  rowBtn: {
+    flex: 1, height: 46, borderRadius: 13,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  rowBtnPrimary: { backgroundColor: DS.primary },
+  rowBtnDanger:  { backgroundColor: DS.error },
+  rowBtnGhost:   { backgroundColor: DS.bg, borderWidth: 1, borderColor: DS.border },
+  rowBtnText:    { fontSize: 14.5, fontWeight: '700' },
+
+  singleBtn: {
+    height: 46, borderRadius: 13, width: '100%',
+    backgroundColor: DS.primary, alignItems: 'center', justifyContent: 'center',
+    marginTop: 20,
+  },
+  singleBtnText: { fontSize: 14.5, fontWeight: '700', color: '#fff' },
+
+  listWrap: { width: '100%', marginTop: 18 },
+  listItem: { paddingVertical: 14, alignItems: 'center' },
+  listItemBorder: { borderBottomWidth: 1, borderBottomColor: DS.border },
+  listItemText: { fontSize: 15, fontWeight: '600', color: DS.text },
+});
+
 // ── Skeleton ──────────────────────────────────────────────────────────
 
 function SkeletonRow() {
@@ -92,28 +268,77 @@ function SkeletonRow() {
 interface CatFormProps {
   visible: boolean;
   initial?: CategoryResponse | null;
-  onSave: (name: string, imageUri?: string) => void;
+  onCreate: (name: string) => Promise<CategoryResponse>;
+  onEdit: (id: number, name: string) => Promise<CategoryResponse>;
+  onSetImage: (id: number, imageUri: string) => Promise<CategoryResponse>;
+  onSaved: (message: string) => void;
   onClose: () => void;
-  saving: boolean;
 }
 
-function CategoryFormModal({ visible, initial, onSave, onClose, saving }: CatFormProps) {
+// Name and photo are shown together on one screen so the whole action reads
+// as a single step. The backend can only accept a photo *after* the category
+// has an id (POST /categories/{id}/image), so a freshly-picked photo is held
+// as a local URI and the actual create → upload happens as one sequence
+// behind a single "Create Category" tap — the vendor never sees that split.
+function CategoryFormModal({ visible, initial, onCreate, onEdit, onSetImage, onSaved, onClose }: CatFormProps) {
+  const isEdit = !!initial;
   const [name, setName]         = useState('');
   const [pickedUri, setPicked]  = useState<string | undefined>(undefined);
+  const [saving, setSaving]     = useState(false);
+  const [error, setError]       = useState<string | null>(null);
+  const enter = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
       setName(initial?.name ?? '');
       setPicked(undefined);
+      setError(null);
+      enter.setValue(0);
+      Animated.spring(enter, { toValue: 1, useNativeDriver: true, friction: 9, tension: 68 }).start();
     }
-  }, [visible, initial]);
+  }, [visible, initial, enter]);
 
   // A freshly-picked local photo takes priority over whatever the category
   // already has saved on the server.
   const previewUri = pickedUri ?? resolveMediaUrl(initial?.imageUrl) ?? null;
 
+  const handleSave = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const saved = isEdit && initial
+        ? await onEdit(initial.id, name.trim())
+        : await onCreate(name.trim());
+
+      if (pickedUri) {
+        try {
+          await onSetImage(saved.id, pickedUri);
+        } catch {
+          // Category itself is safely saved — only the photo failed, so
+          // don't block on it. Say so and let them retry from the edit sheet.
+          onSaved(`${isEdit ? 'Category updated' : 'Category added'} — but the photo failed to upload. Try again from edit.`);
+          onClose();
+          return;
+        }
+      }
+      onSaved(isEdit ? 'Category updated' : 'Category added');
+      onClose();
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to save category — please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const overlayStyle = { opacity: enter };
+  const sheetStyle = {
+    opacity: enter,
+    transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [36, 0] }) }],
+  };
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       {/*
        * Layout: full-screen overlay → KAV (flex:1, justifyContent:'flex-end',
        * behavior='padding') → sheet as a normal flex child.
@@ -125,20 +350,28 @@ function CategoryFormModal({ visible, initial, onSave, onClose, saving }: CatFor
        * Tappable veil sits behind the KAV via absoluteFill so it dismisses
        * the modal when the user taps outside the sheet.
        */}
-      <TouchableOpacity
-        style={[StyleSheet.absoluteFill, styles.veil]}
-        activeOpacity={1}
-        onPress={onClose}
-      />
+      <Animated.View style={[StyleSheet.absoluteFill, styles.veil, overlayStyle]} />
+      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.kavContainer}
       >
-        <View style={styles.catFormSheet}>
+        <Animated.View style={[styles.catFormSheet, sheetStyle]}>
+          <View style={styles.sheetHandle} />
+
           <View style={styles.catFormHeader}>
-            <Text style={styles.catFormTitle}>
-              {initial ? 'Edit Category' : 'New Category'}
-            </Text>
+            <View style={styles.catFormIconWrap}>
+              <Ionicons name="pricetags" size={19} color={DS.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.catFormTitle} numberOfLines={1}>
+                {isEdit ? 'Edit Category' : 'New Category'}
+              </Text>
+              <Text style={styles.catFormSubtitle}>
+                {isEdit ? 'Update the name or photo' : 'Groups items so customers can browse your menu faster'}
+              </Text>
+            </View>
             <TouchableOpacity
               onPress={onClose}
               style={styles.closeBtn}
@@ -147,9 +380,6 @@ function CategoryFormModal({ visible, initial, onSave, onClose, saving }: CatFor
               <Ionicons name="close" size={18} color={DS.text2} />
             </TouchableOpacity>
           </View>
-          <Text style={styles.catFormSubtitle}>
-            Give it a name and a photo — this is how customers will spot it while browsing.
-          </Text>
 
           <View style={styles.catFormImageRow}>
             <CategoryImagePicker uri={previewUri} onPick={setPicked} />
@@ -162,22 +392,38 @@ function CategoryFormModal({ visible, initial, onSave, onClose, saving }: CatFor
             onChangeText={setName}
             placeholder="e.g. Starters, Beverages, Desserts"
             placeholderTextColor={DS.text3}
-            autoFocus
+            autoFocus={!isEdit}
             maxLength={60}
           />
+
+          {!!error && (
+            <View style={styles.catFormErrorBox}>
+              <Ionicons name="alert-circle" size={14} color={DS.error} />
+              <Text style={styles.catFormErrorText}>{error}</Text>
+            </View>
+          )}
+
           <View style={styles.catFormActions}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.saveBtn, (!name.trim() || saving) && { opacity: 0.45 }]}
-              onPress={() => name.trim() && onSave(name.trim(), pickedUri)}
+              onPress={handleSave}
               disabled={!name.trim() || saving}
+              activeOpacity={0.85}
             >
-              <Text style={styles.saveBtnText}>{saving ? 'Saving…' : 'Save'}</Text>
+              {saving ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <View style={styles.catFormSaveContent}>
+                  <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                  <Text style={styles.saveBtnText}>{isEdit ? 'Save Changes' : 'Create Category'}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
-        </View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -189,11 +435,12 @@ interface ItemFormProps {
   visible: boolean;
   initial?: MenuItemResponse | null;
   categories: CategoryResponse[];
+  defaultCategoryId?: number | null;
   onSave: (data: CreateMenuItemRequest) => void;
   onClose: () => void;
 }
 
-function ItemFormModal({ visible, initial, categories, onSave, onClose }: ItemFormProps) {
+function ItemFormModal({ visible, initial, categories, defaultCategoryId, onSave, onClose }: ItemFormProps) {
   const [name, setName]           = useState('');
   const [price, setPrice]         = useState('');
   const [desc, setDesc]           = useState('');
@@ -201,6 +448,7 @@ function ItemFormModal({ visible, initial, categories, onSave, onClose }: ItemFo
   const [categoryId, setCatId]    = useState<number | null>(null);
   const [itemType, setItemType]   = useState<'VEG' | 'NON_VEG' | undefined>(undefined);
   const [available, setAvailable] = useState(true);
+  const { alert, AlertView } = useAppAlert();
 
   useEffect(() => {
     if (visible) {
@@ -208,18 +456,19 @@ function ItemFormModal({ visible, initial, categories, onSave, onClose }: ItemFo
       setPrice(initial?.price != null ? String(initial.price) : '');
       setDesc(initial?.description ?? '');
       setImage(initial?.imageUrl ?? '');
-      setCatId(initial?.categoryId ?? (categories[0]?.id ?? null));
+      setCatId(initial?.categoryId ?? defaultCategoryId ?? (categories[0]?.id ?? null));
       setItemType(initial?.itemType);
       setAvailable((initial?.availabilityStatus ?? 'AVAILABLE') === 'AVAILABLE');
     }
-  }, [visible, initial, categories]);
+  }, [visible, initial, categories, defaultCategoryId]);
 
   const handleSave = () => {
-    if (!name.trim()) { Alert.alert('Required', 'Item name is required.'); return; }
-    if (!categoryId)  { Alert.alert('Required', 'Please select a category.'); return; }
+    if (!name.trim()) { alert('Required', 'Item name is required.'); return; }
+    if (!categoryId)  { alert('Required', 'Please select a category.'); return; }
+    if (!itemType)    { alert('Required', 'Please select Veg or Non-Veg.'); return; }
     const parsedPrice = parseFloat(price);
     if (!parsedPrice || parsedPrice <= 0) {
-      Alert.alert('Required', 'Enter a valid price.');
+      alert('Required', 'Enter a valid price.');
       return;
     }
     onSave({
@@ -234,6 +483,7 @@ function ItemFormModal({ visible, initial, categories, onSave, onClose }: ItemFo
   };
 
   return (
+    <>
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       {/*
        * Non-interactive veil — user must tap Cancel to close (no accidental
@@ -257,7 +507,17 @@ function ItemFormModal({ visible, initial, categories, onSave, onClose }: ItemFo
           <View style={styles.sheetHandle} />
 
           <View style={styles.formHeader}>
-            <Text style={styles.formTitle}>{initial ? 'Edit Item' : 'New Item'}</Text>
+            <View>
+              <Text style={styles.formTitle}>{initial ? 'Edit Item' : 'New Item'}</Text>
+              {!initial && defaultCategoryId != null && (
+                <View style={styles.formTitleContextRow}>
+                  <Ionicons name="pricetag" size={11} color={DS.primary} />
+                  <Text style={styles.formTitleContext}>
+                    Adding to {categories.find(c => c.id === defaultCategoryId)?.name ?? 'category'}
+                  </Text>
+                </View>
+              )}
+            </View>
             <TouchableOpacity
               onPress={onClose}
               style={styles.closeBtn}
@@ -278,47 +538,67 @@ function ItemFormModal({ visible, initial, categories, onSave, onClose }: ItemFo
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingBottom: 8 }}
           >
-            {/* Category */}
-            <Text style={styles.fieldLabel}>Category *</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{ marginBottom: 16 }}
-              keyboardShouldPersistTaps="handled"
-            >
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {categories.map(cat => {
-                  const thumb = resolveMediaUrl(cat.imageUrl);
-                  return (
-                    <TouchableOpacity
-                      key={cat.id}
-                      onPress={() => setCatId(cat.id)}
-                      style={[styles.catPill, categoryId === cat.id && styles.catPillActive]}
-                    >
-                      {thumb ? (
-                        <Image source={{ uri: thumb }} style={styles.catChipThumb} />
-                      ) : (
-                        <View style={[styles.catChipThumb, styles.catChipThumbPlaceholder]}>
-                          <Text style={styles.catChipThumbInitial}>{cat.name.charAt(0).toUpperCase()}</Text>
-                        </View>
-                      )}
-                      <Text style={[styles.catPillText, categoryId === cat.id && styles.catPillTextActive]}>
-                        {cat.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
+            {/* Category — only shown when it isn't already implied by the
+                "Adding to X" context above (i.e. when editing, or as a
+                fallback if no default category came through). */}
+            {(!!initial || defaultCategoryId == null) && (
+              <>
+                <Text style={styles.fieldLabel}>Category *</Text>
+                <Text style={styles.fieldHint}>Where this item shows up on your menu</Text>
+
+                {categories.length === 0 ? (
+                  <View style={styles.catEmptyBox}>
+                    <Ionicons name="alert-circle-outline" size={16} color={DS.text3} />
+                    <Text style={styles.catEmptyText}>
+                      No categories yet — add one from the Menu screen first.
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.catGrid}>
+                    {categories.map(cat => {
+                      const thumb = resolveMediaUrl(cat.imageUrl);
+                      const sel = categoryId === cat.id;
+                      return (
+                        <TouchableOpacity
+                          key={cat.id}
+                          onPress={() => setCatId(cat.id)}
+                          style={[styles.catCard, sel && styles.catCardActive]}
+                          activeOpacity={0.8}
+                        >
+                          {thumb ? (
+                            <Image source={{ uri: thumb }} style={styles.catCardThumb} />
+                          ) : (
+                            <View style={[styles.catCardThumb, styles.catChipThumbPlaceholder]}>
+                              <Text style={styles.catChipThumbInitial}>{cat.name.charAt(0).toUpperCase()}</Text>
+                            </View>
+                          )}
+                          <Text
+                            style={[styles.catCardText, sel && styles.catCardTextActive]}
+                            numberOfLines={1}
+                          >
+                            {cat.name}
+                          </Text>
+                          {sel && (
+                            <View style={styles.catCardCheck}>
+                              <Ionicons name="checkmark" size={11} color="#fff" />
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </>
+            )}
 
             {/* Item Type */}
-            <Text style={styles.fieldLabel}>Item Type</Text>
+            <Text style={styles.fieldLabel}>Item Type *</Text>
             <View style={styles.typeRow}>
               {(['VEG', 'NON_VEG'] as const).map(t => (
                 <TouchableOpacity
                   key={t}
                   style={[styles.typeBtn, itemType === t && styles.typeBtnActive]}
-                  onPress={() => setItemType(prev => (prev === t ? undefined : t))}
+                  onPress={() => setItemType(t)}
                 >
                   <View style={[
                     styles.typeIndicator,
@@ -365,20 +645,6 @@ function ItemFormModal({ visible, initial, categories, onSave, onClose }: ItemFo
               multiline
             />
 
-            {/* Image URL */}
-            <Text style={styles.fieldLabel}>Image URL</Text>
-            <TextInput
-              style={styles.input}
-              value={image}
-              onChangeText={setImage}
-              placeholder="https://…"
-              placeholderTextColor={DS.text3}
-              autoCapitalize="none"
-              keyboardType="url"
-              returnKeyType="done"
-              onSubmitEditing={Keyboard.dismiss}
-            />
-
             {/* Availability */}
             <View style={styles.toggleRow}>
               <Text style={styles.fieldLabel}>Available now</Text>
@@ -404,6 +670,8 @@ function ItemFormModal({ visible, initial, categories, onSave, onClose }: ItemFo
         </View>
       </KeyboardAvoidingView>
     </Modal>
+    <AlertView />
+    </>
   );
 }
 
@@ -571,6 +839,144 @@ function MenuRow({
   );
 }
 
+// ── Floating Add Button ──────────────────────────────────────────────
+
+function AddItemFab({ onPress }: { onPress: () => void }) {
+  const enter = useRef(new Animated.Value(0)).current;
+  const press = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.spring(enter, {
+      toValue: 1,
+      friction: 6,
+      tension: 60,
+      useNativeDriver: true,
+    }).start();
+  }, [enter]);
+
+  const handlePressIn = () => {
+    Animated.spring(press, { toValue: 0.88, useNativeDriver: true, speed: 50, bounciness: 4 }).start();
+  };
+  const handlePressOut = () => {
+    Animated.spring(press, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 9 }).start();
+  };
+
+  const rotate = enter.interpolate({ inputRange: [0, 1], outputRange: ['-45deg', '0deg'] });
+
+  return (
+    <Animated.View
+      style={[
+        styles.fabWrap,
+        { opacity: enter, transform: [{ scale: Animated.multiply(enter, press) }, { rotate }] },
+      ]}
+      pointerEvents="box-none"
+    >
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={0.9}
+        style={styles.fab}
+      >
+        <LinearGradient
+          colors={[DS.primary, DS.primaryDark]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <Ionicons name="add" size={28} color="#fff" />
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+// ── Category Story Row (circular avatars, à la Instagram/WhatsApp) ─────
+// Replaces the old pill/bar chips — a bar of same-height rounded rectangles
+// reads as one continuous strip and buries the "add category" affordance as
+// a tiny icon at the end of it. Distinct circles make each category (and
+// the always-first, always-visible Add circle) its own unmistakable tappable
+// unit, and keep the category photo itself the focal point of each one.
+
+function CategoryCircle({
+  label, imageUri, icon, selected, onPress, onLongPress,
+}: {
+  label: string;
+  imageUri?: string | null;
+  icon?: string;
+  selected: boolean;
+  onPress: () => void;
+  onLongPress?: () => void;
+}) {
+  const press = useRef(new Animated.Value(1)).current;
+  const handlePressIn  = () => Animated.spring(press, { toValue: 0.9, useNativeDriver: true, speed: 50, bounciness: 6 }).start();
+  const handlePressOut = () => Animated.spring(press, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 9 }).start();
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      onLongPress={onLongPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={0.85}
+      style={styles.storyItem}
+    >
+      <Animated.View style={[styles.storyRing, selected && styles.storyRingActive, { transform: [{ scale: press }] }]}>
+        {imageUri ? (
+          <Image source={{ uri: imageUri }} style={styles.storyImg} />
+        ) : (
+          <View style={[styles.storyImg, styles.catChipThumbPlaceholder]}>
+            {icon ? (
+              <Ionicons name={icon as any} size={22} color={DS.primary} />
+            ) : (
+              <Text style={styles.storyImgInitial}>{label.charAt(0).toUpperCase()}</Text>
+            )}
+          </View>
+        )}
+      </Animated.View>
+      <Text style={[styles.storyLabel, selected && styles.storyLabelActive]} numberOfLines={1}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function AddCategoryCircle({ onPress, pulse }: { onPress: () => void; pulse: boolean }) {
+  const press = useRef(new Animated.Value(1)).current;
+  const pulseScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!pulse) { pulseScale.setValue(1); return; }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseScale, { toValue: 1.1, duration: 650, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(pulseScale, { toValue: 1, duration: 650, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse, pulseScale]);
+
+  const handlePressIn  = () => Animated.spring(press, { toValue: 0.9, useNativeDriver: true, speed: 50, bounciness: 6 }).start();
+  const handlePressOut = () => Animated.spring(press, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 9 }).start();
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={0.85}
+      style={styles.storyItem}
+    >
+      <Animated.View style={[styles.storyAddRing, { transform: [{ scale: Animated.multiply(press, pulseScale) }] }]}>
+        <Ionicons name="add" size={24} color={DS.primary} />
+      </Animated.View>
+      <Text style={[styles.storyLabel, pulse && styles.storyLabelPulse]} numberOfLines={1}>
+        Add
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 // ── Main Screen ───────────────────────────────────────────────────────
 
 const AVAIL_FILTERS: { key: AvailFilter; label: string }[] = [
@@ -583,7 +989,7 @@ export default function MenuScreen() {
   const insets = useSafeAreaInsets();
   const {
     categories, items, loading, refreshing, refresh,
-    addCategory, editCategory, removeCategory,
+    addCategory, editCategory, setCategoryImage, removeCategory,
     toggleAvailability, addItem, editItem, removeItem,
   } = useMenu();
 
@@ -597,9 +1003,9 @@ export default function MenuScreen() {
   const [detailItem, setDetailItem]    = useState<MenuItemResponse | null>(null);
   const [catFormVisible, setCatForm]   = useState(false);
   const [editingCat, setEditingCat]    = useState<CategoryResponse | null>(null);
-  const [catSaving, setCatSaving]      = useState(false);
 
   const { show: showToast, ToastView } = useToast();
+  const { alert, AlertView } = useAppAlert();
 
   // ── Derived ──────────────────────────────────────────────────────
 
@@ -624,31 +1030,18 @@ export default function MenuScreen() {
 
   // ── Category handlers ─────────────────────────────────────────────
 
-  const handleSaveCat = useCallback(async (name: string, imageUri?: string) => {
-    setCatSaving(true);
-    try {
-      if (editingCat) {
-        await editCategory(editingCat.id, name, imageUri);
-        showToast('Category updated', 'ok');
-      } else {
-        await addCategory(name, imageUri);
-        showToast('Category added', 'ok');
-      }
-      setCatForm(false);
-      setEditingCat(null);
-    } catch (err: any) {
-      Alert.alert('Error', err?.message ?? 'Failed to save category');
-    } finally {
-      setCatSaving(false);
-    }
-  }, [editingCat, editCategory, addCategory, showToast]);
+  // The modal itself drives its own two-step create/photo flow and calls
+  // these three directly — it only reports back here once fully done.
+  const handleCategorySaved = useCallback((message: string) => {
+    showToast(message, 'ok');
+  }, [showToast]);
 
   const handleCatLongPress = useCallback((cat: CategoryResponse) => {
-    Alert.alert(cat.name, undefined, [
+    alert(cat.name, undefined, [
       { text: 'Edit', onPress: () => { setEditingCat(cat); setCatForm(true); } },
       {
         text: 'Delete', style: 'destructive',
-        onPress: () => Alert.alert(
+        onPress: () => alert(
           'Delete Category',
           `Delete "${cat.name}"? Items in this category may be affected.`,
           [
@@ -661,7 +1054,7 @@ export default function MenuScreen() {
                   if (selectedCatId === cat.id) setSelCatId(null);
                   showToast('Category deleted', 'err');
                 } catch (err: any) {
-                  Alert.alert('Error', err?.message ?? 'Failed to delete category');
+                  alert('Error', err?.message ?? 'Failed to delete category');
                 }
               },
             },
@@ -670,7 +1063,7 @@ export default function MenuScreen() {
       },
       { text: 'Cancel', style: 'cancel' },
     ]);
-  }, [removeCategory, selectedCatId, showToast]);
+  }, [removeCategory, selectedCatId, showToast, alert]);
 
   // ── Item handlers ─────────────────────────────────────────────────
 
@@ -681,7 +1074,7 @@ export default function MenuScreen() {
   }, [toggleAvailability, showToast]);
 
   const handleDelete = useCallback((item: MenuItemResponse) => {
-    Alert.alert('Delete Item', `Remove "${item.name}" permanently?`, [
+    alert('Delete Item', `Remove "${item.name}" permanently?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete', style: 'destructive',
@@ -691,12 +1084,12 @@ export default function MenuScreen() {
             setDetailItem(null);
             showToast('Item deleted', 'err');
           } catch (err: any) {
-            Alert.alert('Error', err?.message ?? 'Failed to delete item');
+            alert('Error', err?.message ?? 'Failed to delete item');
           }
         },
       },
     ]);
-  }, [removeItem, showToast]);
+  }, [removeItem, showToast, alert]);
 
   const handleSaveItem = useCallback(async (data: CreateMenuItemRequest) => {
     try {
@@ -710,15 +1103,38 @@ export default function MenuScreen() {
       setItemForm(false);
       setEditingItem(null);
     } catch (err: any) {
-      Alert.alert('Error', err?.message ?? 'Failed to save item');
+      alert('Error', err?.message ?? 'Failed to save item');
     }
-  }, [editingItem, editItem, addItem, showToast]);
+  }, [editingItem, editItem, addItem, showToast, alert]);
 
   const openEditItem = useCallback((item: MenuItemResponse) => {
     setEditingItem(item);
     setDetailItem(null);
     setItemForm(true);
   }, []);
+
+  const handleAddItemPress = useCallback(() => {
+    if (categories.length === 0) {
+      alert(
+        'No Categories Yet',
+        'Add a menu category first, then you can add items to it.',
+        [
+          { text: 'Add Category', onPress: () => { setEditingCat(null); setCatForm(true); } },
+          { text: 'Cancel', style: 'cancel' },
+        ],
+      );
+      return;
+    }
+    if (selectedCatId === null) {
+      alert(
+        'Select a Category',
+        'Tap a category above (e.g. "Meals") to choose where this item belongs, then add it.',
+      );
+      return;
+    }
+    setEditingItem(null);
+    setItemForm(true);
+  }, [categories.length, selectedCatId, alert]);
 
   // ── Render ────────────────────────────────────────────────────────
 
@@ -734,60 +1150,50 @@ export default function MenuScreen() {
             <Text style={styles.pageTitle}>Menu</Text>
             <Text style={styles.pageSubtitle}>{items.length} Items</Text>
           </View>
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => { setEditingItem(null); setItemForm(true); }}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="add" size={26} color="#fff" />
-          </TouchableOpacity>
         </View>
 
-        {/* Category chips */}
+        {/* First-time hint — only while there are zero categories, since
+            that's exactly when a vendor doesn't yet know where to start. */}
+        {categories.length === 0 && (
+          <View style={styles.catEmptyHintRow}>
+            <Ionicons name="arrow-down" size={13} color={DS.primary} />
+            <Text style={styles.catEmptyHintText}>
+              Tap the + circle below to add your first category
+            </Text>
+          </View>
+        )}
+
+        {/* Category row — circular avatars. Add is always first (never
+            requires scrolling to find), tap any circle to filter, and
+            press-and-hold a category to edit it. */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.catChipsRow}
+          contentContainerStyle={styles.storyRow}
           style={{ marginBottom: 12 }}
         >
-          <TouchableOpacity
-            onPress={() => setSelCatId(null)}
-            style={[styles.catChip, selectedCatId === null && styles.catChipActive]}
-          >
-            <Text style={[styles.catChipText, selectedCatId === null && styles.catChipTextActive]}>
-              All
-            </Text>
-          </TouchableOpacity>
-
-          {categories.map(cat => {
-            const thumb = resolveMediaUrl(cat.imageUrl);
-            return (
-              <TouchableOpacity
-                key={cat.id}
-                onPress={() => setSelCatId(prev => (prev === cat.id ? null : cat.id))}
-                onLongPress={() => handleCatLongPress(cat)}
-                style={[styles.catChip, selectedCatId === cat.id && styles.catChipActive]}
-              >
-                {thumb ? (
-                  <Image source={{ uri: thumb }} style={styles.catChipThumb} />
-                ) : (
-                  <View style={[styles.catChipThumb, styles.catChipThumbPlaceholder]}>
-                    <Text style={styles.catChipThumbInitial}>{cat.name.charAt(0).toUpperCase()}</Text>
-                  </View>
-                )}
-                <Text style={[styles.catChipText, selectedCatId === cat.id && styles.catChipTextActive]}>
-                  {cat.name}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-
-          <TouchableOpacity
-            style={styles.catAddBtn}
+          <AddCategoryCircle
+            pulse={categories.length === 0}
             onPress={() => { setEditingCat(null); setCatForm(true); }}
-          >
-            <Ionicons name="add" size={14} color={DS.primary} />
-          </TouchableOpacity>
+          />
+
+          <CategoryCircle
+            label="All"
+            icon="apps"
+            selected={selectedCatId === null}
+            onPress={() => setSelCatId(null)}
+          />
+
+          {categories.map(cat => (
+            <CategoryCircle
+              key={cat.id}
+              label={cat.name}
+              imageUri={resolveMediaUrl(cat.imageUrl)}
+              selected={selectedCatId === cat.id}
+              onPress={() => setSelCatId(prev => (prev === cat.id ? null : cat.id))}
+              onLongPress={() => handleCatLongPress(cat)}
+            />
+          ))}
         </ScrollView>
 
         {/* Search */}
@@ -892,14 +1298,17 @@ export default function MenuScreen() {
       <CategoryFormModal
         visible={catFormVisible}
         initial={editingCat}
-        onSave={handleSaveCat}
+        onCreate={addCategory}
+        onEdit={editCategory}
+        onSetImage={setCategoryImage}
+        onSaved={handleCategorySaved}
         onClose={() => { setCatForm(false); setEditingCat(null); }}
-        saving={catSaving}
       />
       <ItemFormModal
         visible={itemFormVisible}
         initial={editingItem}
         categories={categories}
+        defaultCategoryId={selectedCatId}
         onSave={handleSaveItem}
         onClose={() => { setItemForm(false); setEditingItem(null); }}
       />
@@ -911,7 +1320,10 @@ export default function MenuScreen() {
         onDelete={() => detailItem && handleDelete(detailItem)}
       />
 
+      <AddItemFab onPress={handleAddItemPress} />
+
       <ToastView />
+      <AlertView />
     </View>
   );
 }
@@ -933,36 +1345,48 @@ const styles = StyleSheet.create({
   },
   pageTitle:    { fontSize: 28, fontWeight: '800', color: DS.text },
   pageSubtitle: { fontSize: 13, color: DS.text2, marginTop: 2, fontWeight: '500' },
-  addBtn: {
-    width: 44, height: 44, borderRadius: 14,
-    backgroundColor: DS.primary,
+
+  // Floating add button
+  fabWrap: { position: 'absolute', right: 20, bottom: 24, zIndex: 50 },
+  fab: {
+    width: 60, height: 60, borderRadius: 30,
     alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
     shadowColor: DS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 10,
   },
 
-  // Category chips
-  catChipsRow: { flexDirection: 'row', gap: 8, paddingRight: 4 },
-  catChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 10, paddingVertical: 6,
-    borderRadius: 20, borderWidth: 1.5, borderColor: DS.border,
-    backgroundColor: DS.surface,
-  },
-  catChipActive:     { backgroundColor: DS.primary, borderColor: DS.primary },
-  catChipText:       { fontSize: 13, color: DS.text2, fontWeight: '500' },
-  catChipTextActive: { color: '#fff', fontWeight: '700' },
-  catChipThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: DS.bg },
+  // Category "story" row — circular avatars replacing the old pill bar
   catChipThumbPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: DS.primarySoft },
   catChipThumbInitial: { fontSize: 11, fontWeight: '800', color: DS.primary },
-  catAddBtn: {
-    width: 32, height: 32, borderRadius: 16,
-    borderWidth: 1.5, borderColor: DS.primary,
+
+  catEmptyHintRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    marginBottom: 8,
+  },
+  catEmptyHintText: { fontSize: 12.5, fontWeight: '600', color: DS.primary },
+
+  storyRow: { flexDirection: 'row', gap: 14, paddingRight: 4 },
+  storyItem: { alignItems: 'center', width: 64, gap: 6 },
+  storyRing: {
+    width: 60, height: 60, borderRadius: 30,
+    borderWidth: 2.5, borderColor: 'transparent',
     alignItems: 'center', justifyContent: 'center',
+  },
+  storyRingActive: { borderColor: DS.primary },
+  storyImg: { width: 52, height: 52, borderRadius: 26, backgroundColor: DS.bg },
+  storyImgInitial: { fontSize: 18, fontWeight: '800', color: DS.primary },
+  storyLabel:       { fontSize: 11.5, fontWeight: '600', color: DS.text2, textAlign: 'center' },
+  storyLabelActive: { color: DS.primary, fontWeight: '700' },
+  storyLabelPulse:  { color: DS.primary, fontWeight: '800' },
+  storyAddRing: {
+    width: 60, height: 60, borderRadius: 30,
+    borderWidth: 2, borderColor: DS.primary, borderStyle: 'dashed',
     backgroundColor: DS.primarySoft,
+    alignItems: 'center', justifyContent: 'center',
   },
 
   // Search
@@ -1009,7 +1433,7 @@ const styles = StyleSheet.create({
   skeletonBody:  { flex: 1 },
 
   // List
-  listContent: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 32 },
+  listContent: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 100 },
 
   // Item row
   row: {
@@ -1100,6 +1524,8 @@ const styles = StyleSheet.create({
     alignItems: 'center', marginBottom: 20,
   },
   formTitle:  { fontSize: 18, fontWeight: '700', color: DS.text },
+  formTitleContextRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  formTitleContext:    { fontSize: 12, fontWeight: '600', color: DS.primary },
   fieldLabel: {
     fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.7,
     color: DS.text3, marginBottom: 6, fontWeight: '600',
@@ -1118,14 +1544,31 @@ const styles = StyleSheet.create({
   },
   typeBtnActive: { borderColor: DS.primary, backgroundColor: DS.primarySoft },
   typeBtnText:   { fontSize: 14, color: DS.text2, fontWeight: '500' },
-  catPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
-    borderWidth: 1, borderColor: DS.border, backgroundColor: DS.bg,
+
+  // Category picker — item form
+  fieldHint: { fontSize: 12, color: DS.text3, marginTop: -3, marginBottom: 10, lineHeight: 16 },
+  catGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
+  catCard: {
+    width: 88, alignItems: 'center', gap: 6,
+    paddingVertical: 12, paddingHorizontal: 8, borderRadius: 14,
+    borderWidth: 1.5, borderColor: DS.border, backgroundColor: DS.bg,
   },
-  catPillActive:     { backgroundColor: DS.primary, borderColor: DS.primary },
-  catPillText:       { fontSize: 13, color: DS.text2, fontWeight: '500' },
-  catPillTextActive: { color: '#fff', fontWeight: '600' },
+  catCardActive: { borderColor: DS.primary, backgroundColor: DS.primarySoft },
+  catCardThumb:  { width: 40, height: 40, borderRadius: 20, backgroundColor: DS.surface },
+  catCardText:       { fontSize: 12.5, color: DS.text2, fontWeight: '600', textAlign: 'center' },
+  catCardTextActive: { color: DS.primary },
+  catCardCheck: {
+    position: 'absolute', top: 8, right: 8,
+    width: 16, height: 16, borderRadius: 8,
+    backgroundColor: DS.primary, alignItems: 'center', justifyContent: 'center',
+  },
+  catEmptyBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: DS.bg, borderRadius: 12, borderWidth: 1, borderColor: DS.border,
+    padding: 12, marginBottom: 16,
+  },
+  catEmptyText: { flex: 1, fontSize: 12.5, color: DS.text3, lineHeight: 17 },
+
   toggleRow: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', marginBottom: 14, paddingVertical: 4,
@@ -1147,27 +1590,39 @@ const styles = StyleSheet.create({
   catFormSheet: {
     maxHeight: '90%',
     backgroundColor: DS.surface,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     paddingHorizontal: 24,
-    paddingTop: 24,
+    paddingTop: 12,
     paddingBottom: 28,
     borderTopWidth: 1,
     borderColor: DS.border,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.12, shadowRadius: 20, elevation: 12,
   },
   catFormHeader: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 6,
+    flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 22,
   },
-  catFormTitle:    { fontSize: 18, fontWeight: '700', color: DS.text },
-  catFormSubtitle: { fontSize: 12.5, color: DS.text3, lineHeight: 17, marginBottom: 18 },
-  catFormImageRow: { alignItems: 'center', marginBottom: 20 },
+  catFormIconWrap: {
+    width: 40, height: 40, borderRadius: 13,
+    backgroundColor: DS.primarySoft, alignItems: 'center', justifyContent: 'center',
+  },
+  catFormTitle:    { fontSize: 18, fontWeight: '800', color: DS.text },
+  catFormSubtitle: { fontSize: 12.5, color: DS.text3, lineHeight: 17, marginTop: 3 },
+
+  catFormImageRow: { alignItems: 'center', marginBottom: 22 },
   catFormInput: {
     backgroundColor: DS.bg, borderWidth: 1.5, borderColor: DS.border,
     borderRadius: 12, color: DS.text, fontSize: 15,
-    paddingHorizontal: 14, paddingVertical: 13, marginBottom: 16,
+    paddingHorizontal: 14, paddingVertical: 13, marginBottom: 6,
   },
-  catFormActions: { flexDirection: 'row', gap: 10 },
+  catFormErrorBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14, marginTop: 6,
+  },
+  catFormErrorText: { flex: 1, fontSize: 12, color: DS.error, lineHeight: 16 },
+
+  catFormActions: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  catFormSaveContent: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 
   // Detail sheet (no keyboard interaction needed — stays position:absolute)
   detailSheet: {

@@ -1,8 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   View, TouchableOpacity, StyleSheet, StatusBar,
   ScrollView, Alert, ActivityIndicator, Modal,
 } from 'react-native';
+import Animated, {
+  useSharedValue, useAnimatedStyle, withTiming, Easing, FadeIn, FadeOut,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import Text from '../../components/Text';
 import TextInput from '../../components/TextInput';
@@ -11,6 +14,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchRedemptionById } from '../../modules/redemption/services/redemptionService';
 import type { RedemptionRequest, RedemptionStatus } from '../../modules/redemption/services/redemptionService';
 import { useRedemption } from '../../modules/redemption/store/RedemptionContext';
+import { getSubscription, getSubscriptionValidityDays } from '../../modules/cards/services/cardService';
+import type { SubscriptionResponse } from '../../modules/cards/types/card.types';
+import WalletConsumptionGrid from '../../modules/cards/components/WalletConsumptionGrid';
 
 // ─── Design tokens ───────────────────────────────────────────────────
 const DS = {
@@ -76,6 +82,67 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+// Collapsible so the vendor can tuck the grid away without losing the
+// redemption details around it — the grid unmounts on collapse (its wave
+// loop has no reason to keep running off-screen) and fades in on expand,
+// while the chevron rotates smoothly to signal the current state.
+function WalletGridPanel({ subscription, isPending }: {
+  subscription: SubscriptionResponse;
+  isPending: boolean;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const chevronProgress = useSharedValue(1);
+
+  useEffect(() => {
+    chevronProgress.value = withTiming(expanded ? 1 : 0, { duration: 240, easing: Easing.out(Easing.cubic) });
+  }, [expanded, chevronProgress]);
+
+  const chevronStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${chevronProgress.value * 180}deg` }],
+  }));
+
+  return (
+    <View style={styles.section}>
+      <TouchableOpacity
+        style={styles.walletToggleRow}
+        onPress={() => setExpanded(e => !e)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.walletToggleLeft}>
+          <Ionicons name="water" size={14} color={DS.primary} />
+          <Text style={styles.sectionTitle}>WALLET GRID</Text>
+        </View>
+        <Animated.View style={chevronStyle}>
+          <Ionicons name="chevron-down" size={18} color={DS.text3} />
+        </Animated.View>
+      </TouchableOpacity>
+
+      {expanded && (
+        <Animated.View
+          entering={FadeIn.duration(220)}
+          exiting={FadeOut.duration(150)}
+          style={styles.sectionCard}
+        >
+          <View style={{ padding: 16 }}>
+            <WalletConsumptionGrid
+              originalWalletAmount={subscription.originalWalletAmount}
+              walletBalance={subscription.walletBalance}
+              consumedAmount={subscription.consumedAmount}
+              consumptionPercentage={subscription.consumptionPercentage}
+              totalCells={getSubscriptionValidityDays(subscription)}
+            />
+            {isPending && (
+              <Text style={styles.walletPendingNote}>
+                Reflects the current balance — this request hasn't been deducted yet.
+              </Text>
+            )}
+          </View>
+        </Animated.View>
+      )}
+    </View>
+  );
+}
+
 function InfoRow({ label, value, valueColor, last = false }: {
   label: string;
   value: string;
@@ -111,6 +178,22 @@ export default function RedemptionDetailScreen() {
   const [rejectVisible, setRejectVisible]   = useState(false);
   const [rejectReason, setRejectReason]     = useState('');
 
+  // The redemption record itself carries no wallet fields — it's fetched
+  // separately from the same subscription endpoint the Store Subscriptions
+  // detail modal uses, keyed off the redemption's subscriptionId. Best-effort:
+  // if it fails, the WALLET section just doesn't render — it must never block
+  // viewing or approving/rejecting the redemption itself.
+  const [subscription, setSubscription] = useState<SubscriptionResponse | null>(null);
+
+  const loadSubscription = useCallback(async (subscriptionId: number) => {
+    try {
+      const sub = await getSubscription(subscriptionId);
+      setSubscription(sub);
+    } catch {
+      // Best-effort — see comment above.
+    }
+  }, []);
+
   const load = useCallback(async () => {
     if (!id) return;
     setLoading(true);
@@ -119,13 +202,14 @@ export default function RedemptionDetailScreen() {
     try {
       const data = await fetchRedemptionById(id);
       setRedemption(data);
+      loadSubscription(data.subscriptionId);
     } catch (e: any) {
       setError(e?.message ?? 'Failed to load redemption');
       setErrorStatus(e?.status ?? null);
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, loadSubscription]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -139,6 +223,10 @@ export default function RedemptionDetailScreen() {
       // Reload this detail from backend so status reflects truth
       const updated = await fetchRedemptionById(redemption.id);
       setRedemption(updated);
+      // Approval is what actually moves walletBalance server-side — re-fetch
+      // the subscription so the grid animates from its old level to the new
+      // one, instead of jumping or staying stale.
+      loadSubscription(updated.subscriptionId);
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to approve');
     } finally {
@@ -270,6 +358,17 @@ export default function RedemptionDetailScreen() {
                 </View>
               </View>
             </View>
+
+            {/* Wallet — same WalletConsumptionGrid used in the Store
+                Subscriptions detail sheet, driven by a fresh fetch of the
+                subscription itself. This is always the subscription's
+                CURRENT backend state: while this request is still pending,
+                the backend hasn't touched walletBalance for it yet, so the
+                grid correctly shows pre-approval consumption, not a preview
+                of what approving would do. Collapsible — see WalletGridPanel. */}
+            {subscription && subscription.originalWalletAmount != null && subscription.consumptionPercentage != null && (
+              <WalletGridPanel subscription={subscription} isPending={redemption.status === 'pending'} />
+            )}
 
             {/* Items — quantity bubble + computed line total, so the math
                 behind the total value is easy to verify at a glance */}
@@ -561,6 +660,9 @@ const styles = StyleSheet.create({
   itemName:       { fontSize: 14, fontWeight: '700', color: DS.text },
   itemUnitPrice:  { fontSize: 12, color: DS.text3, marginTop: 2 },
   itemLineTotal:  { fontSize: 14, fontWeight: '800', color: DS.text, flexShrink: 0 },
+  walletPendingNote: {
+    fontSize: 12, color: DS.text3, textAlign: 'center', marginTop: 12, lineHeight: 17,
+  },
 
   // Sections
   section:      { marginBottom: 20 },
@@ -573,6 +675,13 @@ const styles = StyleSheet.create({
     backgroundColor: DS.surface, borderRadius: 16,
     borderWidth: 1, borderColor: DS.border, overflow: 'hidden',
   },
+
+  // Wallet grid panel — collapsible header row
+  walletToggleRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: 8, paddingVertical: 4,
+  },
+  walletToggleLeft: { flexDirection: 'row', alignItems: 'center', gap: 7 },
 
   // Info rows
   infoRow: {

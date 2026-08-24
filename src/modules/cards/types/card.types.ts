@@ -112,4 +112,11 @@ export interface SubscriptionResponse {
   purchasedAt: string;
   expiresAt: string;
   createdAt: string;
+  // Wallet consumption tracking (the *wallet* value, distinct from originalAmount/
+  // finalAmount above which are what the customer paid for the card). Null on
+  // historical subscriptions created before this tracking existed — never derive
+  // these from cardPrice, CardDefinition.walletAmount, or redemption counts.
+  originalWalletAmount: number | null;
+  consumedAmount: number | null;
+  consumptionPercentage: number | null;
 }
