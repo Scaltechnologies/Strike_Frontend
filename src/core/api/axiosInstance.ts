@@ -11,17 +11,15 @@ import {
 import { setMaintenance } from '../maintenance/maintenanceStore';
 import { resetNotificationStore } from '../../modules/notifications/store/notificationStore';
 
-// Backed by EXPO_PUBLIC_API_URL (see .env) — Expo inlines EXPO_PUBLIC_* vars into
-// the JS bundle at build time. Override per-machine via a gitignored .env.local,
-// and set per-environment values (staging/production) in EAS build profile env
-// vars before shipping, rather than editing this fallback.
-const FALLBACK_BASE_URL = 'http://192.168.88.12:8080';
-export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || FALLBACK_BASE_URL;
+const FALLBACK_BASE_URL = 'https://api.strikeapp.in';
+
+export const BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL || FALLBACK_BASE_URL;
 
 if (__DEV__ && !process.env.EXPO_PUBLIC_API_URL) {
   console.warn(
     `[axiosInstance] EXPO_PUBLIC_API_URL is not set — falling back to ${FALLBACK_BASE_URL}. ` +
-    'Set it in .env or a gitignored .env.local.',
+      'Set it in .env or a gitignored .env.local.',
   );
 }
 
