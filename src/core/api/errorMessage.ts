@@ -14,7 +14,12 @@ export function getUserMessage(
   fallback = 'Something went wrong. Please try again.',
 ): string {
   const raw = err instanceof Error ? err.message : String(err ?? '');
-  if (raw && __DEV__) console.error('[API error]', raw);
+  // console.log, not warn/error — RN's LogBox intercepts *both* warn and
+  // error and pops a full-screen blocking overlay in dev. This fires for
+  // errors that are already caught and shown to the vendor via in-app UI (a
+  // toast, an inline error box), so it only needs to reach the Metro
+  // terminal for debugging, not hijack the device screen.
+  if (raw && __DEV__) console.log('[API error]', raw);
 
   const looksRaw = raw.length > 220 || RAW_EXCEPTION_MARKERS.some(marker => raw.includes(marker));
   return !raw || looksRaw ? fallback : raw;

@@ -18,6 +18,7 @@ import {
 } from '../../../modules/menu/hooks/useMenu';
 import CategoryImagePicker from '../../../modules/menu/components/CategoryImagePicker';
 import { resolveMediaUrl } from '../../../core/api/mediaUrl';
+import { getUserMessage } from '../../../core/api/errorMessage';
 import { SkeletonBlock } from '../../../components/Skeleton';
 import FadeIn from '../../../components/FadeIn';
 
@@ -314,18 +315,19 @@ function CategoryFormModal({ visible, initial, onCreate, onEdit, onSetImage, onS
       if (pickedUri) {
         try {
           await onSetImage(saved.id, pickedUri);
-        } catch {
+        } catch (imgErr) {
           // Category itself is safely saved — only the photo failed, so
           // don't block on it. Say so and let them retry from the edit sheet.
-          onSaved(`${isEdit ? 'Category updated' : 'Category added'} — but the photo failed to upload. Try again from edit.`);
+          const reason = getUserMessage(imgErr, 'please try again');
+          onSaved(`${isEdit ? 'Category updated' : 'Category added'} — but the photo failed to upload (${reason}). Try again from edit.`);
           onClose();
           return;
         }
       }
       onSaved(isEdit ? 'Category updated' : 'Category added');
       onClose();
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to save category — please try again.');
+    } catch (err) {
+      setError(getUserMessage(err, 'Failed to save category — please try again.'));
     } finally {
       setSaving(false);
     }

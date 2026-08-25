@@ -17,6 +17,10 @@
 // FileSystem.uploadAsync sidesteps both: it streams the file natively and
 // never constructs a JS-side FormData/Blob at all.
 import * as FileSystem from 'expo-file-system/legacy';
+import axios from 'axios';
+import { router } from 'expo-router';
+import { BASE_URL } from './axiosInstance';
+import { getRefreshToken, saveTokens, clearAll } from '../storage/secureStorage';
 
 export interface UploadFileResult {
   status: number;
@@ -30,12 +34,12 @@ function guessMimeType(filename: string): string {
   return 'image/jpeg';
 }
 
-export async function uploadFile(
+async function attemptUpload(
   url: string,
   localUri: string,
   fieldName: string,
   token: string | null,
-  timeoutMs = 30000,
+  timeoutMs: number,
 ): Promise<UploadFileResult> {
   const filename = localUri.split('/').pop() || `upload-${Date.now()}.jpg`;
   const mimeType = guessMimeType(filename);
@@ -61,5 +65,47 @@ export async function uploadFile(
   } catch (err: any) {
     if (err?.name === 'TimeoutError') throw err;
     throw new Error(err?.message || 'Upload failed. Check your connection and try again.');
+  }
+}
+
+// Mirrors axiosInstance's refresh-on-401 interceptor. uploadAsync attaches
+// the Authorization header manually (it never goes through axios), so
+// without this an access token that expires between login and the next
+// photo upload fails the upload with a bare 401 while every other request
+// in the app keeps working — refreshed transparently by axiosInstance.
+async function refreshAccessToken(): Promise<string> {
+  const refreshToken = await getRefreshToken();
+  if (!refreshToken) throw new Error('no refresh token');
+
+  const res = await axios.post(
+    `${BASE_URL}/api/auth/refresh`,
+    { refreshToken },
+    { headers: { 'Content-Type': 'application/json' } },
+  );
+
+  const data = res.data?.data ?? res.data;
+  const newAccess: string = data.token ?? data.accessToken;
+  const newRefresh: string = data.refreshToken;
+  await saveTokens({ accessToken: newAccess, refreshToken: newRefresh });
+  return newAccess;
+}
+
+export async function uploadFile(
+  url: string,
+  localUri: string,
+  fieldName: string,
+  token: string | null,
+  timeoutMs = 30000,
+): Promise<UploadFileResult> {
+  const result = await attemptUpload(url, localUri, fieldName, token, timeoutMs);
+  if (result.status !== 401 || !token) return result;
+
+  try {
+    const freshToken = await refreshAccessToken();
+    return await attemptUpload(url, localUri, fieldName, freshToken, timeoutMs);
+  } catch {
+    await clearAll();
+    router.replace('/(auth)/login');
+    throw new Error('Session expired. Please log in again.');
   }
 }

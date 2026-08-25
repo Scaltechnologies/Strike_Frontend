@@ -102,7 +102,18 @@ export async function uploadCategoryImage(
   if (!body) {
     throw new Error('Malformed response from server.');
   }
-  return body.data;
+
+  // The backend returns the same image path for every upload to this
+  // category (keyed only by categoryId, not by file version), so re-uploading
+  // a photo returns an unchanged imageUrl. RN's <Image> caches by URI, so
+  // without a cache-busting suffix the old photo keeps showing after a
+  // successful re-upload until the app restarts. Stamp a query param here,
+  // at the moment we know the upload just succeeded, so the URI is
+  // guaranteed fresh for the caller to render immediately.
+  const data = body.data;
+  return data.imageUrl
+    ? { ...data, imageUrl: `${data.imageUrl}${data.imageUrl.includes('?') ? '&' : '?'}v=${Date.now()}` }
+    : data;
 }
 
 // ── Menu Items ──────────────────────────────────────────────────────
