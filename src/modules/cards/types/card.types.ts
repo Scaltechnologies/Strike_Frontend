@@ -108,6 +108,9 @@ export interface SubscriptionResponse {
   originalAmount: number;
   discountApplied: number;
   finalAmount: number;
+  // How this card was paid for. Null for subscriptions predating this field, or granted directly
+  // by an admin (no real payment) — treat null as "no badge," never assume ONLINE.
+  paymentMethod: 'ONLINE' | 'PAY_AT_STORE' | null;
   status: SubscriptionStatus;
   purchasedAt: string;
   expiresAt: string;

@@ -50,6 +50,25 @@ function statusStyle(s: SubscriptionStatus) {
   return { bg: DS.bg, fg: DS.text3 };
 }
 
+// Small "how they paid" stamp shown on both the list row and the detail ticket. Null (predates
+// this field, or an admin-granted card with no real payment) renders nothing — never guess ONLINE.
+function paymentMethodMeta(method: SubscriptionResponse['paymentMethod']) {
+  if (method === 'ONLINE') return { label: 'Online', icon: 'globe-outline' as const };
+  if (method === 'PAY_AT_STORE') return { label: 'Pay at Store', icon: 'storefront-outline' as const };
+  return null;
+}
+
+function PaymentMethodStamp({ method }: { method: SubscriptionResponse['paymentMethod'] }) {
+  const meta = paymentMethodMeta(method);
+  if (!meta) return null;
+  return (
+    <View style={styles.paymentStamp}>
+      <Ionicons name={meta.icon} size={11} color={DS.text2} />
+      <Text style={styles.paymentStampText}>{meta.label}</Text>
+    </View>
+  );
+}
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', {
     day: 'numeric', month: 'short', year: 'numeric',
@@ -114,7 +133,10 @@ function SubscriptionCard({ item, onPress }: { item: SubscriptionResponse; onPre
         </View>
         <View style={styles.cardBody}>
           <Text style={styles.cardName} numberOfLines={1}>{item.cardName}</Text>
-          <Text style={styles.cardSub}>{item.customerName ?? 'Customer'}</Text>
+          <View style={styles.cardSubRow}>
+            <Text style={styles.cardSub}>{item.customerName ?? 'Customer'}</Text>
+            <PaymentMethodStamp method={item.paymentMethod} />
+          </View>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
           <View style={[styles.dot, { backgroundColor: sc.fg }]} />
@@ -233,6 +255,9 @@ function SubscriptionDetailModal({ item, onClose }: { item: SubscriptionResponse
                   )}
                   {!!item.couponCode && <DetailRow label="Coupon Used" value={item.couponCode} />}
                   <DetailRow label="Amount Paid" value={formatCurrency(item.finalAmount)} valueColor={DS.text} />
+                  {paymentMethodMeta(item.paymentMethod) && (
+                    <DetailRow label="Payment Method" value={paymentMethodMeta(item.paymentMethod)!.label} />
+                  )}
                   <DetailRow label="Purchased On" value={formatDate(item.purchasedAt)} />
                   <DetailRow
                     label="Expires On"
@@ -500,7 +525,13 @@ const styles = StyleSheet.create({
   },
   cardBody: { flex: 1 },
   cardName: { fontSize: 15, fontWeight: '700', color: DS.text },
-  cardSub:  { fontSize: 12, color: DS.text3, marginTop: 2 },
+  cardSubRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+  cardSub:  { fontSize: 12, color: DS.text3 },
+  paymentStamp: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: DS.bg, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2,
+  },
+  paymentStampText: { fontSize: 10, fontWeight: '700', color: DS.text2 },
   statusBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     borderRadius: 20, paddingHorizontal: 9, paddingVertical: 5,
