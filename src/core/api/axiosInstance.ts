@@ -126,8 +126,12 @@ axiosInstance.interceptors.response.use(
         body?.error ||
         (typeof body === 'string' ? body : JSON.stringify(body)) ||
         `HTTP ${status}`;
-      const apiError = new Error(`[${status}] ${url} — ${message}`) as Error & { status?: number };
+      const apiError = new Error(`[${status}] ${url} — ${message}`) as Error & { status?: number; code?: string };
       apiError.status = status;
+      // Stable machine-readable error code (e.g. card-service's PaymentErrorCode enum name —
+      // INVALID_QR, TOO_MANY_ATTEMPTS, etc.) — callers that need to branch per-error-type should
+      // check this instead of parsing `message` text.
+      if (typeof body?.code === 'string') apiError.code = body.code;
       return Promise.reject(apiError);
     }
 

@@ -8,9 +8,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Text from '../../../components/Text';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useRedemption } from '../../../modules/redemption/store/RedemptionContext';
 import type { RedemptionRequest } from '../../../modules/redemption/services/redemptionService';
+import { usePayAtStore } from '../../../modules/payAtStore/store/PayAtStoreContext';
 import { resolveMediaUrl } from '../../../core/api/mediaUrl';
 import NotificationBell from '../../../modules/notifications/components/NotificationBell';
 import { SkeletonBlock } from '../../../components/Skeleton';
@@ -491,6 +492,7 @@ function QueueRow({ order, onPreview }: {
 // ─── Main Screen ───────────────────────────────────────────────────
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const {
     storeName,
     storeAddress,
@@ -504,6 +506,7 @@ export default function HomeScreen() {
     approveRedemption,
     rejectRedemption,
   } = useRedemption();
+  const { pending: pasPending, loadPending: loadPasPending } = usePayAtStore();
 
   const [filter, setFilter]               = useState<'pending' | 'confirmed'>('pending');
   const [previewOrder, setPreview]        = useState<RedemptionRequest | null>(null);
@@ -523,6 +526,14 @@ export default function HomeScreen() {
     const poll = setInterval(() => { loadAll(false, true); }, QUEUE_POLL_INTERVAL_MS);
     return () => clearInterval(poll);
   }, [loadAll]));
+
+  // Pay-at-Store pending count for the quick-access row below — same silent-poll cadence as the
+  // redemption queue above.
+  useFocusEffect(useCallback(() => {
+    loadPasPending();
+    const poll = setInterval(() => { loadPasPending(false, true); }, QUEUE_POLL_INTERVAL_MS);
+    return () => clearInterval(poll);
+  }, [loadPasPending]));
 
   const onRefresh = useCallback(() => loadAll(true), [loadAll]);
 
@@ -614,6 +625,37 @@ export default function HomeScreen() {
             <Text style={styles.statNumber}>{confirmedTodayOrders.length}</Text>
             <Text style={styles.statLabel}>CONFIRMED TODAY</Text>
           </View>
+        </View>
+
+        {/* Pay at Store — quick access to the pending queue + scanner */}
+        <View style={styles.pasRow}>
+          <TouchableOpacity
+            style={styles.pasCard}
+            onPress={() => router.push('/(main)/pay-at-store')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.pasIconWrap}>
+              <Ionicons name="storefront-outline" size={18} color={DS.accent} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.pasTitle}>Pay at Store</Text>
+              <Text style={styles.pasSubtitle} numberOfLines={1}>
+                {pasPending.length > 0 ? `${pasPending.length} pending` : 'No payments waiting'}
+              </Text>
+            </View>
+            {pasPending.length > 0 && (
+              <View style={styles.pasBadge}>
+                <Text style={styles.pasBadgeText}>{pasPending.length}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.pasScanBtn}
+            onPress={() => router.push('/(main)/pay-at-store-scan')}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="qr-code-outline" size={20} color="#fff" />
+          </TouchableOpacity>
         </View>
 
         {/* Filter tabs */}
@@ -798,6 +840,32 @@ const styles = StyleSheet.create({
   },
   statNumber: { fontSize: 22, fontWeight: '800', color: DS.primary },
   statLabel:  { fontSize: 10, fontWeight: '700', color: DS.text3, letterSpacing: 0.5, marginTop: 2 },
+
+  // Pay at Store quick access
+  pasRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  pasCard: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: DS.accentSoft, borderRadius: 12,
+    paddingVertical: 10, paddingHorizontal: 12,
+    borderWidth: 1, borderColor: '#F0DCC0',
+  },
+  pasIconWrap: {
+    width: 32, height: 32, borderRadius: 9,
+    backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center',
+  },
+  pasTitle: { fontSize: 13, fontWeight: '700', color: DS.text },
+  pasSubtitle: { fontSize: 11, color: DS.text2, marginTop: 1 },
+  pasBadge: {
+    minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6,
+    backgroundColor: DS.primary, alignItems: 'center', justifyContent: 'center',
+  },
+  pasBadgeText: { fontSize: 11, fontWeight: '800', color: '#fff' },
+  pasScanBtn: {
+    width: 48, borderRadius: 12, backgroundColor: DS.primary,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: DS.primary, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25, shadowRadius: 8, elevation: 4,
+  },
 
   // Filter tabs
   filterRow: { flexDirection: 'row', gap: 8, paddingBottom: 12 },

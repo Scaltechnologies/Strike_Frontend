@@ -44,6 +44,12 @@
           "color": "#CC2200",
           "defaultChannel": "default"
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Strike needs your camera to scan a customer's Pay-at-Store QR code."
+        }
       ]
     ],
     "extra": {

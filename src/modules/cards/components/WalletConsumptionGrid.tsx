@@ -12,9 +12,10 @@
 // the subscription has no consumption tracking (originalWalletAmount === null).
 
 import { useCallback, useEffect, useState } from 'react';
-import { View, StyleSheet, LayoutChangeEvent } from 'react-native';
+import { View, StyleSheet, Platform, LayoutChangeEvent } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, withRepeat, Easing,
+  interpolate, Extrapolation,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import Text from '../../../components/Text';
@@ -94,12 +95,29 @@ function WaterCell({
     };
   });
 
+  // Matches the user app's cellCheck: fades/scales in only over the last 15%
+  // of a cell's own fill, reaching full opacity right as it tops off — no
+  // bounce, so it reads as the box quietly completing rather than popping.
+  const tickStyle = useAnimatedStyle(() => {
+    const fraction = clamp(progress.value - index, 0, 1);
+    const t = interpolate(fraction, [0.85, 1], [0, 1], Extrapolation.CLAMP);
+    return { opacity: t, transform: [{ scale: 0.5 + t * 0.5 }] };
+  });
+
   return (
     <View style={[cellStyles.cell, { width: size, height: size }]}>
       <Animated.View style={[cellStyles.fill, { width: size, height: size }, fillStyle]}>
         <View style={[StyleSheet.absoluteFill, { backgroundColor: WATER.top }]} />
         <Animated.View
           style={[cellStyles.waveStrip, { width: size * 1.5, left: -size * 0.25 }, waveStyle]}
+        />
+      </Animated.View>
+      <Animated.View style={[cellStyles.tickWrap, tickStyle]} pointerEvents="none">
+        <Ionicons
+          name="checkmark"
+          size={Math.max(12, size * 0.5)}
+          color="#fff"
+          style={cellStyles.tickShine}
         />
       </Animated.View>
     </View>
@@ -260,5 +278,15 @@ const cellStyles = StyleSheet.create({
     position: 'absolute', top: -3,
     height: 6, borderRadius: 3,
     backgroundColor: 'rgba(255,255,255,0.4)',
+  },
+  tickWrap: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  tickShine: {
+    ...Platform.select({
+      ios: { shadowColor: '#fff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 8 },
+      android: {},
+    }),
   },
 });

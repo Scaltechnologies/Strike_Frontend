@@ -67,6 +67,17 @@ const endpoints = {
     reject:  (id: string) => `/api/redemptions/${id}/reject`,
   },
 
+  // ── Pay at Store (vendor confirmation) ────────────────────────────
+  // VendorPayAtStoreController → /api/payments/pay-at-store (card-service, auth required, VENDOR role)
+  // vendorId is derived from the JWT server-side — no storeId/vendorId param needed.
+  payAtStore: {
+    pending:    '/api/payments/pay-at-store/pending',
+    history:    '/api/payments/pay-at-store/history',
+    verifyQr:   '/api/payments/pay-at-store/verify-qr',
+    verifyCode: '/api/payments/pay-at-store/verify-code',
+    confirm:    (id: number | string) => `/api/payments/pay-at-store/${id}/confirm`,
+  },
+
   // ── Ledger ─────────────────────────────────────────────────────────
   // VendorTransactionController → /api/ledger
   ledger: {
