@@ -37,13 +37,22 @@ const endpoints = {
   // ── Menu Management ────────────────────────────────────────────────
   // CategoryController → /api/menu/categories
   // MenuItemController → /api/menu/items
+  //
+  // Category ownership: categories are global master data, owned and
+  // mutated only through the separate admin panel (SUPER_ADMIN-only
+  // endpoints on admin-service, not part of this app). vendor-service's
+  // /api/menu/categories is GET-only — it has no POST/PUT/DELETE routes at
+  // all — so there is no vendor-scoped category mutation route to
+  // deliberately omit anymore; this app reads the single GET route below
+  // (via categoryService.fetchActiveCategories) and nothing else exists to call.
   menu: {
     categories:        '/api/menu/categories',
-    category:          (categoryId: number) => `/api/menu/categories/${categoryId}`,
-    categoryImage:     (categoryId: number) => `/api/menu/categories/${categoryId}/image`,
     items:             '/api/menu/items',
     item:              (itemId: number) => `/api/menu/items/${itemId}`,
     itemsByCategory:   (categoryId: number) => `/api/menu/items/by-category/${categoryId}`,
+    // Confirmed live on vendor-service. menuService.uploadMenuItemImage() still degrades
+    // gracefully on failure (item still saves) since a photo upload is a secondary step.
+    itemImage:         (itemId: number) => `/api/menu/items/${itemId}/image`,
   },
 
   // ── Card Management ────────────────────────────────────────────────

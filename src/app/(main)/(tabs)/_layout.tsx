@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
-import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Text from '../../../components/Text';
 
@@ -15,8 +16,9 @@ const TABS = [
 ];
 
 function CustomTabBar({ state, navigation }: any) {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.bar}>
+    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
       {state.routes.map((route: any, i: number) => {
         const focused = state.index === i;
         const tab = TABS[i];
@@ -65,7 +67,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     paddingHorizontal: 6,
     paddingTop: 10,
-    paddingBottom: Platform.OS === 'ios' ? 26 : 12,
     borderTopWidth: 1,
     borderTopColor: '#F0F0F0',
     elevation: 12,

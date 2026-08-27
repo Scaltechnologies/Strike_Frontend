@@ -1,42 +1,38 @@
 import { useState, useCallback } from 'react';
-import { Alert } from 'react-native';
+import { fetchActiveCategories } from '../services/categoryService';
 import {
-  fetchCategories,
   fetchMenuItems,
-  createCategory,
-  updateCategory,
-  deleteCategory,
-  uploadCategoryImage,
   createMenuItem,
   updateMenuItem,
   deleteMenuItem,
+  uploadMenuItemImage,
+} from '../services/menuService';
+import { getUserMessage } from '../../../core/api/errorMessage';
+import type {
   CategoryResponse,
   MenuItemResponse,
-  CreateCategoryRequest,
   CreateMenuItemRequest,
-} from '../services/menuService';
+} from '../types/menu.types';
 
-export type { CategoryResponse, MenuItemResponse, CreateCategoryRequest, CreateMenuItemRequest };
+export type { CategoryResponse, MenuItemResponse, CreateMenuItemRequest };
 
 export interface UseMenuReturn {
   categories: CategoryResponse[];
   items: MenuItemResponse[];
   loading: boolean;
   refreshing: boolean;
+  // Set only when the most recent load attempt failed outright (not when a
+  // background refresh fails but we still have a previously-loaded list —
+  // stale-but-present data is kept and shown rather than wiped).
+  loadError: string | null;
   refresh: (isRefresh?: boolean) => Promise<void>;
-  // Category CRUD
-  // Category image upload needs a categoryId, so it's always a separate call
-  // (setCategoryImage) made after the category itself already exists — never
-  // bundled into addCategory/editCategory.
-  addCategory: (name: string) => Promise<CategoryResponse>;
-  editCategory: (id: number, name: string) => Promise<CategoryResponse>;
-  setCategoryImage: (id: number, imageUri: string) => Promise<CategoryResponse>;
-  removeCategory: (id: number) => Promise<void>;
-  // Item CRUD
+  // Item CRUD — category mutations do not exist here by design: categories
+  // are read-only master data for the vendor app (see categoryService.ts).
   toggleAvailability: (item: MenuItemResponse) => Promise<void>;
-  addItem: (payload: CreateMenuItemRequest) => Promise<void>;
-  editItem: (itemId: number, payload: Partial<CreateMenuItemRequest>) => Promise<void>;
+  addItem: (payload: CreateMenuItemRequest) => Promise<MenuItemResponse>;
+  editItem: (itemId: number, payload: Partial<CreateMenuItemRequest>) => Promise<MenuItemResponse>;
   removeItem: (itemId: number) => Promise<void>;
+  setItemImage: (itemId: number, imageUri: string) => Promise<MenuItemResponse>;
 }
 
 export function useMenu(): UseMenuReturn {
@@ -44,15 +40,17 @@ export function useMenu(): UseMenuReturn {
   const [items, setItems]           = useState<MenuItemResponse[]>([]);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError]   = useState<string | null>(null);
 
   const refresh = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
-      const [cats, menuItems] = await Promise.all([fetchCategories(), fetchMenuItems()]);
+      const [cats, menuItems] = await Promise.all([fetchActiveCategories(), fetchMenuItems()]);
       setCategories(cats);
       setItems(menuItems);
-    } catch (err: any) {
-      Alert.alert('Error', err?.message ?? 'Failed to load menu');
+      setLoadError(null);
+    } catch (err) {
+      setLoadError(getUserMessage(err, "Couldn't load your menu."));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -61,31 +59,6 @@ export function useMenu(): UseMenuReturn {
 
   // Fetch is driven by the screen (useFocusEffect) rather than mount here,
   // so revisiting the Menu tab always picks up changes made elsewhere.
-
-  // ── Category CRUD ──────────────────────────────────────────────────
-
-  const addCategory = useCallback(async (name: string) => {
-    const created = await createCategory({ name });
-    setCategories(prev => [...prev, created]);
-    return created;
-  }, []);
-
-  const editCategory = useCallback(async (id: number, name: string) => {
-    const updated = await updateCategory(id, { name });
-    setCategories(prev => prev.map(c => (c.id === id ? updated : c)));
-    return updated;
-  }, []);
-
-  const setCategoryImage = useCallback(async (id: number, imageUri: string) => {
-    const updated = await uploadCategoryImage(id, imageUri);
-    setCategories(prev => prev.map(c => (c.id === id ? updated : c)));
-    return updated;
-  }, []);
-
-  const removeCategory = useCallback(async (id: number) => {
-    await deleteCategory(id);
-    setCategories(prev => prev.filter(c => c.id !== id));
-  }, []);
 
   // ── Item CRUD ──────────────────────────────────────────────────────
 
@@ -97,19 +70,20 @@ export function useMenu(): UseMenuReturn {
     );
     try {
       await updateMenuItem(item.id, { availabilityStatus: next });
-    } catch (err: any) {
+    } catch (err) {
       setItems(prev =>
         prev.map(i =>
           i.id === item.id ? { ...i, availabilityStatus: item.availabilityStatus } : i,
         ),
       );
-      Alert.alert('Error', err?.message ?? 'Failed to update availability');
+      throw err;
     }
   }, []);
 
   const addItem = useCallback(async (payload: CreateMenuItemRequest) => {
     const created = await createMenuItem(payload);
     setItems(prev => [...prev, created]);
+    return created;
   }, []);
 
   const editItem = useCallback(async (
@@ -118,6 +92,7 @@ export function useMenu(): UseMenuReturn {
   ) => {
     const updated = await updateMenuItem(itemId, payload);
     setItems(prev => prev.map(i => (i.id === itemId ? updated : i)));
+    return updated;
   }, []);
 
   const removeItem = useCallback(async (itemId: number) => {
@@ -125,19 +100,23 @@ export function useMenu(): UseMenuReturn {
     setItems(prev => prev.filter(i => i.id !== itemId));
   }, []);
 
+  const setItemImage = useCallback(async (itemId: number, imageUri: string) => {
+    const updated = await uploadMenuItemImage(itemId, imageUri);
+    setItems(prev => prev.map(i => (i.id === itemId ? updated : i)));
+    return updated;
+  }, []);
+
   return {
     categories,
     items,
     loading,
     refreshing,
+    loadError,
     refresh,
-    addCategory,
-    editCategory,
-    setCategoryImage,
-    removeCategory,
     toggleAvailability,
     addItem,
     editItem,
     removeItem,
+    setItemImage,
   };
 }

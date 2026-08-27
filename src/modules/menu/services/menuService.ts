@@ -1,122 +1,15 @@
+// src/modules/menu/services/menuService.ts
+// Menu ITEM operations only. Category reads live in categoryService.ts —
+// there is deliberately no category CRUD here; see menu.types.ts.
+
 import axiosInstance, { BASE_URL } from '../../../core/api/axiosInstance';
 import endpoints from '../../../core/api/endpoints';
 import { getAccessToken } from '../../../core/storage/secureStorage';
 import { uploadFile } from '../../../core/api/fileUpload';
 import type { ApiResponse } from '../../../core/types/api.types';
+import type { MenuItemResponse, CreateMenuItemRequest } from '../types/menu.types';
 
-export interface CategoryResponse {
-  id: number;
-  name: string;
-  description?: string;
-  imageUrl?: string;
-  displayOrder: number;
-  status: 'ACTIVE' | 'INACTIVE';
-  storeId: number;
-}
-
-export interface MenuItemResponse {
-  id: number;
-  name: string;
-  description?: string;
-  price: number;
-  imageUrl?: string;
-  itemType?: 'VEG' | 'NON_VEG';
-  availabilityStatus: 'AVAILABLE' | 'OUT_OF_STOCK';
-  categoryId: number;
-  storeId: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateCategoryRequest {
-  name: string;
-}
-
-export interface CreateMenuItemRequest {
-  name: string;
-  price: number;
-  categoryId: number;
-  description?: string;
-  imageUrl?: string;
-  itemType?: 'VEG' | 'NON_VEG';
-  availabilityStatus?: 'AVAILABLE' | 'OUT_OF_STOCK';
-}
-
-// ── Categories ──────────────────────────────────────────────────────
-
-export async function fetchCategories(): Promise<CategoryResponse[]> {
-  const res = await axiosInstance.get<ApiResponse<CategoryResponse[]>>(endpoints.menu.categories);
-  return res.data.data ?? [];
-}
-
-export async function createCategory(
-  payload: CreateCategoryRequest,
-): Promise<CategoryResponse> {
-  const res = await axiosInstance.post<ApiResponse<CategoryResponse>>(
-    endpoints.menu.categories,
-    payload,
-  );
-  return res.data.data;
-}
-
-export async function updateCategory(
-  id: number,
-  payload: Partial<CreateCategoryRequest>,
-): Promise<CategoryResponse> {
-  const res = await axiosInstance.put<ApiResponse<CategoryResponse>>(
-    endpoints.menu.category(id),
-    payload,
-  );
-  return res.data.data;
-}
-
-export async function deleteCategory(id: number): Promise<void> {
-  await axiosInstance.delete(endpoints.menu.category(id));
-}
-
-// POST /api/menu/categories/{id}/image — multipart upload, field name "file".
-// Uses expo-file-system's native uploadAsync — see fileUpload.ts for why
-// fetch()+FormData()+Blob doesn't work in this app's RN environment.
-export async function uploadCategoryImage(
-  categoryId: number,
-  localUri: string,
-): Promise<CategoryResponse> {
-  const token = await getAccessToken();
-  const url = `${BASE_URL}${endpoints.menu.categoryImage(categoryId)}`;
-
-  const res = await uploadFile(url, localUri, 'file', token);
-
-  const body: ApiResponse<CategoryResponse> | null = (() => {
-    try { return JSON.parse(res.body); } catch { return null; }
-  })();
-
-  if (res.status === 413) {
-    throw new Error('That photo is too large for the server to accept — please pick a different one.');
-  }
-  if (res.status < 200 || res.status >= 300) {
-    const message = body?.message || `HTTP ${res.status}`;
-    const apiError = new Error(`[${res.status}] ${endpoints.menu.categoryImage(categoryId)} — ${message}`) as Error & { status?: number };
-    apiError.status = res.status;
-    throw apiError;
-  }
-  if (!body) {
-    throw new Error('Malformed response from server.');
-  }
-
-  // The backend returns the same image path for every upload to this
-  // category (keyed only by categoryId, not by file version), so re-uploading
-  // a photo returns an unchanged imageUrl. RN's <Image> caches by URI, so
-  // without a cache-busting suffix the old photo keeps showing after a
-  // successful re-upload until the app restarts. Stamp a query param here,
-  // at the moment we know the upload just succeeded, so the URI is
-  // guaranteed fresh for the caller to render immediately.
-  const data = body.data;
-  return data.imageUrl
-    ? { ...data, imageUrl: `${data.imageUrl}${data.imageUrl.includes('?') ? '&' : '?'}v=${Date.now()}` }
-    : data;
-}
-
-// ── Menu Items ──────────────────────────────────────────────────────
+export type { MenuItemResponse, CreateMenuItemRequest };
 
 export async function fetchMenuItems(): Promise<MenuItemResponse[]> {
   const res = await axiosInstance.get<ApiResponse<MenuItemResponse[]>>(endpoints.menu.items);
@@ -146,4 +39,40 @@ export async function updateMenuItem(
 
 export async function deleteMenuItem(itemId: number): Promise<void> {
   await axiosInstance.delete(endpoints.menu.item(itemId));
+}
+
+// POST /api/menu/items/{id}/image — confirmed live on vendor-service (see
+// endpoints.ts). Still handled leniently on failure: the item itself already
+// saved successfully via createMenuItem/updateMenuItem, so a failed photo
+// upload is "photo unavailable for now", not a reason to fail the whole save.
+export async function uploadMenuItemImage(
+  itemId: number,
+  localUri: string,
+): Promise<MenuItemResponse> {
+  const token = await getAccessToken();
+  const url = `${BASE_URL}${endpoints.menu.itemImage(itemId)}`;
+
+  const res = await uploadFile(url, localUri, 'file', token);
+
+  const body: ApiResponse<MenuItemResponse> | null = (() => {
+    try { return JSON.parse(res.body); } catch { return null; }
+  })();
+
+  if (res.status === 413) {
+    throw new Error('That photo is too large for the server to accept — please pick a different one.');
+  }
+  if (res.status < 200 || res.status >= 300) {
+    const message = body?.message || `HTTP ${res.status}`;
+    const apiError = new Error(`[${res.status}] ${endpoints.menu.itemImage(itemId)} — ${message}`) as Error & { status?: number };
+    apiError.status = res.status;
+    throw apiError;
+  }
+  if (!body) {
+    throw new Error('Malformed response from server.');
+  }
+
+  const data = body.data;
+  return data.imageUrl
+    ? { ...data, imageUrl: `${data.imageUrl}${data.imageUrl.includes('?') ? '&' : '?'}v=${Date.now()}` }
+    : data;
 }

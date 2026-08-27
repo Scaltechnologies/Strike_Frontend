@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View, TouchableOpacity, FlatList, StyleSheet,
-  StatusBar, Switch, Image, Modal, ScrollView, Animated, Easing,
+  StatusBar, Switch, Image, Modal, ScrollView, Animated,
   Platform, KeyboardAvoidingView, Share, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,13 +10,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Text from '../../../components/Text';
 import TextInput from '../../../components/TextInput';
 import { Ionicons } from '@expo/vector-icons';
+import type { TextInput as RNTextInput } from 'react-native';
 import {
   useMenu,
   CategoryResponse,
   MenuItemResponse,
   CreateMenuItemRequest,
 } from '../../../modules/menu/hooks/useMenu';
-import CategoryImagePicker from '../../../modules/menu/components/CategoryImagePicker';
+import ItemImagePicker from '../../../modules/menu/components/ItemImagePicker';
+import CategorySelectorSheet from '../../../modules/menu/components/CategorySelectorSheet';
+import { getLastUsedCategoryId, setLastUsedCategoryId } from '../../../modules/menu/state/lastUsedCategory';
 import { resolveMediaUrl } from '../../../core/api/mediaUrl';
 import { getUserMessage } from '../../../core/api/errorMessage';
 import { SkeletonBlock } from '../../../components/Skeleton';
@@ -264,173 +267,6 @@ function SkeletonRow() {
   );
 }
 
-// ── Category Form Modal ───────────────────────────────────────────────
-
-interface CatFormProps {
-  visible: boolean;
-  initial?: CategoryResponse | null;
-  onCreate: (name: string) => Promise<CategoryResponse>;
-  onEdit: (id: number, name: string) => Promise<CategoryResponse>;
-  onSetImage: (id: number, imageUri: string) => Promise<CategoryResponse>;
-  onSaved: (message: string) => void;
-  onClose: () => void;
-}
-
-// Name and photo are shown together on one screen so the whole action reads
-// as a single step. The backend can only accept a photo *after* the category
-// has an id (POST /categories/{id}/image), so a freshly-picked photo is held
-// as a local URI and the actual create → upload happens as one sequence
-// behind a single "Create Category" tap — the vendor never sees that split.
-function CategoryFormModal({ visible, initial, onCreate, onEdit, onSetImage, onSaved, onClose }: CatFormProps) {
-  const isEdit = !!initial;
-  const [name, setName]         = useState('');
-  const [pickedUri, setPicked]  = useState<string | undefined>(undefined);
-  const [saving, setSaving]     = useState(false);
-  const [error, setError]       = useState<string | null>(null);
-  const enter = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (visible) {
-      setName(initial?.name ?? '');
-      setPicked(undefined);
-      setError(null);
-      enter.setValue(0);
-      Animated.spring(enter, { toValue: 1, useNativeDriver: true, friction: 9, tension: 68 }).start();
-    }
-  }, [visible, initial, enter]);
-
-  // A freshly-picked local photo takes priority over whatever the category
-  // already has saved on the server.
-  const previewUri = pickedUri ?? resolveMediaUrl(initial?.imageUrl) ?? null;
-
-  const handleSave = async () => {
-    if (!name.trim()) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const saved = isEdit && initial
-        ? await onEdit(initial.id, name.trim())
-        : await onCreate(name.trim());
-
-      if (pickedUri) {
-        try {
-          await onSetImage(saved.id, pickedUri);
-        } catch (imgErr) {
-          // Category itself is safely saved — only the photo failed, so
-          // don't block on it. Say so and let them retry from the edit sheet.
-          const reason = getUserMessage(imgErr, 'please try again');
-          onSaved(`${isEdit ? 'Category updated' : 'Category added'} — but the photo failed to upload (${reason}). Try again from edit.`);
-          onClose();
-          return;
-        }
-      }
-      onSaved(isEdit ? 'Category updated' : 'Category added');
-      onClose();
-    } catch (err) {
-      setError(getUserMessage(err, 'Failed to save category — please try again.'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const overlayStyle = { opacity: enter };
-  const sheetStyle = {
-    opacity: enter,
-    transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [36, 0] }) }],
-  };
-
-  return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      {/*
-       * Layout: full-screen overlay → KAV (flex:1, justifyContent:'flex-end',
-       * behavior='padding') → sheet as a normal flex child.
-       *
-       * When the keyboard opens, KAV adds paddingBottom = keyboardHeight.
-       * Because the sheet is a flex-end child of KAV, its bottom edge stays
-       * pinned exactly at the keyboard's top edge — on both iOS and Android.
-       *
-       * Tappable veil sits behind the KAV via absoluteFill so it dismisses
-       * the modal when the user taps outside the sheet.
-       */}
-      <Animated.View style={[StyleSheet.absoluteFill, styles.veil, overlayStyle]} />
-      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
-
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.kavContainer}
-      >
-        <Animated.View style={[styles.catFormSheet, sheetStyle]}>
-          <View style={styles.sheetHandle} />
-
-          <View style={styles.catFormHeader}>
-            <View style={styles.catFormIconWrap}>
-              <Ionicons name="pricetags" size={19} color={DS.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.catFormTitle} numberOfLines={1}>
-                {isEdit ? 'Edit Category' : 'New Category'}
-              </Text>
-              <Text style={styles.catFormSubtitle}>
-                {isEdit ? 'Update the name or photo' : 'Groups items so customers can browse your menu faster'}
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={onClose}
-              style={styles.closeBtn}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="close" size={18} color={DS.text2} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.catFormImageRow}>
-            <CategoryImagePicker uri={previewUri} onPick={setPicked} />
-          </View>
-
-          <Text style={styles.fieldLabel}>Category Name *</Text>
-          <TextInput
-            style={styles.catFormInput}
-            value={name}
-            onChangeText={setName}
-            placeholder="e.g. Starters, Beverages, Desserts"
-            placeholderTextColor={DS.text3}
-            autoFocus={!isEdit}
-            maxLength={60}
-          />
-
-          {!!error && (
-            <View style={styles.catFormErrorBox}>
-              <Ionicons name="alert-circle" size={14} color={DS.error} />
-              <Text style={styles.catFormErrorText}>{error}</Text>
-            </View>
-          )}
-
-          <View style={styles.catFormActions}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.saveBtn, (!name.trim() || saving) && { opacity: 0.45 }]}
-              onPress={handleSave}
-              disabled={!name.trim() || saving}
-              activeOpacity={0.85}
-            >
-              {saving ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <View style={styles.catFormSaveContent}>
-                  <Ionicons name="checkmark-circle" size={16} color="#fff" />
-                  <Text style={styles.saveBtnText}>{isEdit ? 'Save Changes' : 'Create Category'}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
-}
-
 // ── Item Form Modal ───────────────────────────────────────────────────
 
 interface ItemFormProps {
@@ -438,18 +274,33 @@ interface ItemFormProps {
   initial?: MenuItemResponse | null;
   categories: CategoryResponse[];
   defaultCategoryId?: number | null;
-  onSave: (data: CreateMenuItemRequest) => void;
+  onCreate: (data: CreateMenuItemRequest) => Promise<MenuItemResponse>;
+  onEdit: (id: number, data: Partial<CreateMenuItemRequest>) => Promise<MenuItemResponse>;
+  onSetImage: (id: number, imageUri: string) => Promise<MenuItemResponse>;
+  onSaved: (message: string, categoryId: number) => void;
   onClose: () => void;
 }
 
-function ItemFormModal({ visible, initial, categories, defaultCategoryId, onSave, onClose }: ItemFormProps) {
+// Category context is never re-asked from scratch: it's always shown as a
+// pre-filled "Curries ✓ · Change" summary (defaultCategoryId → last category
+// the vendor used this session → first category), never a blank required
+// picker. "Save & Add Another" keeps that category sticky across saves so
+// adding several items to the same category is a single fast loop — see
+// PART 11-13 of the redesign brief this screen implements.
+function ItemFormModal({
+  visible, initial, categories, defaultCategoryId, onCreate, onEdit, onSetImage, onSaved, onClose,
+}: ItemFormProps) {
   const [name, setName]           = useState('');
   const [price, setPrice]         = useState('');
   const [desc, setDesc]           = useState('');
-  const [image, setImage]         = useState('');
+  const [image, setImage]         = useState(''); // existing remote imageUrl (edit mode)
+  const [pickedUri, setPickedUri] = useState<string | null>(null); // freshly picked local uri
   const [categoryId, setCatId]    = useState<number | null>(null);
   const [itemType, setItemType]   = useState<'VEG' | 'NON_VEG' | undefined>(undefined);
   const [available, setAvailable] = useState(true);
+  const [catPickerOpen, setCatPickerOpen] = useState(false);
+  const [saving, setSaving]       = useState(false);
+  const nameRef = useRef<RNTextInput>(null);
   const { alert, AlertView } = useAppAlert();
 
   useEffect(() => {
@@ -458,13 +309,29 @@ function ItemFormModal({ visible, initial, categories, defaultCategoryId, onSave
       setPrice(initial?.price != null ? String(initial.price) : '');
       setDesc(initial?.description ?? '');
       setImage(initial?.imageUrl ?? '');
-      setCatId(initial?.categoryId ?? defaultCategoryId ?? (categories[0]?.id ?? null));
+      setPickedUri(null);
+      setCatId(initial?.categoryId ?? defaultCategoryId ?? getLastUsedCategoryId() ?? (categories[0]?.id ?? null));
       setItemType(initial?.itemType);
       setAvailable((initial?.availabilityStatus ?? 'AVAILABLE') === 'AVAILABLE');
+      setSaving(false);
     }
   }, [visible, initial, categories, defaultCategoryId]);
 
-  const handleSave = () => {
+  // Clears everything except the category (and re-focuses Name) so adding a
+  // run of items to the same category — e.g. four curries in a row — never
+  // makes the vendor touch the category field more than once.
+  const resetForAnother = useCallback(() => {
+    setName('');
+    setPrice('');
+    setDesc('');
+    setImage('');
+    setPickedUri(null);
+    setItemType(undefined);
+    setAvailable(true);
+    requestAnimationFrame(() => nameRef.current?.focus());
+  }, []);
+
+  const doSave = async (addAnother: boolean) => {
     if (!name.trim()) { alert('Required', 'Item name is required.'); return; }
     if (!categoryId)  { alert('Required', 'Please select a category.'); return; }
     if (!itemType)    { alert('Required', 'Please select Veg or Non-Veg.'); return; }
@@ -473,16 +340,46 @@ function ItemFormModal({ visible, initial, categories, defaultCategoryId, onSave
       alert('Required', 'Enter a valid price.');
       return;
     }
-    onSave({
+
+    const payload: CreateMenuItemRequest = {
       name:               name.trim(),
       price:              parsedPrice,
       categoryId,
       description:        desc.trim() || undefined,
-      imageUrl:           image.trim() || undefined,
       itemType,
       availabilityStatus: available ? 'AVAILABLE' : 'OUT_OF_STOCK',
-    });
+    };
+
+    setSaving(true);
+    try {
+      const saved = initial ? await onEdit(initial.id, payload) : await onCreate(payload);
+
+      if (pickedUri) {
+        try {
+          await onSetImage(saved.id, pickedUri);
+        } catch (imgErr) {
+          const reason = getUserMessage(imgErr, 'please try again');
+          onSaved(`${initial ? 'Item updated' : 'Item added'} — but the photo failed to upload (${reason}). Try again from edit.`, categoryId);
+          if (addAnother && !initial) { resetForAnother(); } else { onClose(); }
+          return;
+        }
+      }
+
+      onSaved(initial ? 'Item updated' : 'Item added', categoryId);
+      if (addAnother && !initial) {
+        resetForAnother();
+      } else {
+        onClose();
+      }
+    } catch (err) {
+      alert('Error', getUserMessage(err, 'Failed to save item — please try again.'));
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const selectedCategory = categories.find(c => c.id === categoryId) ?? null;
+  const previewImageUri = pickedUri ?? resolveMediaUrl(image);
 
   return (
     <>
@@ -509,17 +406,7 @@ function ItemFormModal({ visible, initial, categories, defaultCategoryId, onSave
           <View style={styles.sheetHandle} />
 
           <View style={styles.formHeader}>
-            <View>
-              <Text style={styles.formTitle}>{initial ? 'Edit Item' : 'New Item'}</Text>
-              {!initial && defaultCategoryId != null && (
-                <View style={styles.formTitleContextRow}>
-                  <Ionicons name="pricetag" size={11} color={DS.primary} />
-                  <Text style={styles.formTitleContext}>
-                    Adding to {categories.find(c => c.id === defaultCategoryId)?.name ?? 'category'}
-                  </Text>
-                </View>
-              )}
-            </View>
+            <Text style={styles.formTitle}>{initial ? 'Edit Item' : 'New Item'}</Text>
             <TouchableOpacity
               onPress={onClose}
               style={styles.closeBtn}
@@ -540,57 +427,50 @@ function ItemFormModal({ visible, initial, categories, defaultCategoryId, onSave
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingBottom: 8 }}
           >
-            {/* Category — only shown when it isn't already implied by the
-                "Adding to X" context above (i.e. when editing, or as a
-                fallback if no default category came through). */}
-            {(!!initial || defaultCategoryId == null) && (
-              <>
-                <Text style={styles.fieldLabel}>Category *</Text>
-                <Text style={styles.fieldHint}>Where this item shows up on your menu</Text>
+            {/* Food photo */}
+            <View style={styles.itemImageRow}>
+              <ItemImagePicker uri={previewImageUri} onPick={setPickedUri} />
+            </View>
 
-                {categories.length === 0 ? (
-                  <View style={styles.catEmptyBox}>
-                    <Ionicons name="alert-circle-outline" size={16} color={DS.text3} />
-                    <Text style={styles.catEmptyText}>
-                      No categories yet — add one from the Menu screen first.
+            {/* Category — always a pre-filled summary, never a blank picker.
+                Tapping it opens the shared CategorySelectorSheet; the vendor
+                only ever touches this when they actually want to change it. */}
+            <Text style={styles.fieldLabel}>Category *</Text>
+            {categories.length === 0 ? (
+              <View style={styles.catEmptyBox}>
+                <Ionicons name="alert-circle-outline" size={16} color={DS.text3} />
+                <Text style={styles.catEmptyText}>
+                  No categories yet — add one from the Menu screen first.
+                </Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.catSummaryRow}
+                onPress={() => setCatPickerOpen(true)}
+                activeOpacity={0.8}
+              >
+                {selectedCategory && resolveMediaUrl(selectedCategory.imageUrl) ? (
+                  <Image source={{ uri: resolveMediaUrl(selectedCategory.imageUrl)! }} style={styles.catSummaryThumb} />
+                ) : (
+                  <View style={[styles.catSummaryThumb, styles.catChipThumbPlaceholder]}>
+                    <Text style={styles.catChipThumbInitial}>
+                      {(selectedCategory?.name ?? '?').charAt(0).toUpperCase()}
                     </Text>
                   </View>
-                ) : (
-                  <View style={styles.catGrid}>
-                    {categories.map(cat => {
-                      const thumb = resolveMediaUrl(cat.imageUrl);
-                      const sel = categoryId === cat.id;
-                      return (
-                        <TouchableOpacity
-                          key={cat.id}
-                          onPress={() => setCatId(cat.id)}
-                          style={[styles.catCard, sel && styles.catCardActive]}
-                          activeOpacity={0.8}
-                        >
-                          {thumb ? (
-                            <Image source={{ uri: thumb }} style={styles.catCardThumb} />
-                          ) : (
-                            <View style={[styles.catCardThumb, styles.catChipThumbPlaceholder]}>
-                              <Text style={styles.catChipThumbInitial}>{cat.name.charAt(0).toUpperCase()}</Text>
-                            </View>
-                          )}
-                          <Text
-                            style={[styles.catCardText, sel && styles.catCardTextActive]}
-                            numberOfLines={1}
-                          >
-                            {cat.name}
-                          </Text>
-                          {sel && (
-                            <View style={styles.catCardCheck}>
-                              <Ionicons name="checkmark" size={11} color="#fff" />
-                            </View>
-                          )}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
                 )}
-              </>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.catSummaryNameRow}>
+                    <Text style={styles.catSummaryName} numberOfLines={1}>
+                      {selectedCategory?.name ?? 'Select a category'}
+                    </Text>
+                    {!!selectedCategory && <Ionicons name="checkmark-circle" size={15} color={DS.success} />}
+                  </View>
+                </View>
+                <View style={styles.changePill}>
+                  <Text style={styles.changePillText}>Change</Text>
+                  <Ionicons name="chevron-forward" size={13} color={DS.primary} />
+                </View>
+              </TouchableOpacity>
             )}
 
             {/* Item Type */}
@@ -616,6 +496,7 @@ function ItemFormModal({ visible, initial, categories, defaultCategoryId, onSave
             {/* Name */}
             <Text style={styles.fieldLabel}>Name *</Text>
             <TextInput
+              ref={nameRef}
               style={styles.input}
               value={name}
               onChangeText={setName}
@@ -660,18 +541,46 @@ function ItemFormModal({ visible, initial, categories, defaultCategoryId, onSave
             </View>
           </ScrollView>
 
-          {/* Buttons are outside ScrollView — always visible at the bottom of the sheet */}
-          <View style={styles.formActions}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-              <Text style={styles.saveBtnText}>{initial ? 'Save Changes' : 'Add Item'}</Text>
-            </TouchableOpacity>
-          </View>
+          {/* Buttons are outside ScrollView — always visible at the bottom of the sheet.
+              Editing keeps the familiar Cancel + Save pair; adding a new item
+              swaps in "Save & Add Another" so a run of items to one category
+              never requires re-opening this sheet from scratch. */}
+          {initial ? (
+            <View style={styles.formActions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={onClose} disabled={saving}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.saveBtn} onPress={() => doSave(false)} disabled={saving} activeOpacity={0.85}>
+                {saving ? <ActivityIndicator color="#fff" size="small" /> : (
+                  <Text style={styles.saveBtnText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.formActionsStack}>
+              <TouchableOpacity style={styles.saveBtnFull} onPress={() => doSave(false)} disabled={saving} activeOpacity={0.85}>
+                {saving ? <ActivityIndicator color="#fff" size="small" /> : (
+                  <Text style={styles.saveBtnText}>Save Item</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.saveAnotherBtn} onPress={() => doSave(true)} disabled={saving} activeOpacity={0.8}>
+                <Ionicons name="add-circle-outline" size={16} color={DS.primary} />
+                <Text style={styles.saveAnotherBtnText}>Save & Add Another</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </KeyboardAvoidingView>
     </Modal>
+
+    <CategorySelectorSheet
+      visible={catPickerOpen}
+      categories={categories}
+      selectedId={categoryId}
+      onSelect={(id) => { setCatId(id); setCatPickerOpen(false); }}
+      onClose={() => setCatPickerOpen(false)}
+    />
+
     <AlertView />
     </>
   );
@@ -749,6 +658,9 @@ function DetailSheet({
         </LinearGradient>
 
         <View style={styles.detailBody}>
+          {!!resolveMediaUrl(item.imageUrl) && (
+            <Image source={{ uri: resolveMediaUrl(item.imageUrl)! }} style={styles.detailItemImage} resizeMode="cover" />
+          )}
           {!!item.description && (
             <View style={styles.detailDescCard}>
               <Text style={styles.detailDesc}>{item.description}</Text>
@@ -805,8 +717,8 @@ function MenuRow({
     >
       {!isAvail && <View style={styles.inactiveStrip} />}
 
-      {item.imageUrl ? (
-        <Image source={{ uri: item.imageUrl }} style={styles.rowImg} resizeMode="cover" />
+      {resolveMediaUrl(item.imageUrl) ? (
+        <Image source={{ uri: resolveMediaUrl(item.imageUrl)! }} style={styles.rowImg} resizeMode="cover" />
       ) : (
         <View style={[styles.rowImg, styles.rowImgPlaceholder]}>
           <Text style={styles.rowImgInitial}>{item.name.charAt(0).toUpperCase()}</Text>
@@ -843,7 +755,7 @@ function MenuRow({
 
 // ── Floating Add Button ──────────────────────────────────────────────
 
-function AddItemFab({ onPress }: { onPress: () => void }) {
+function AddItemFab({ onPress, dimmed }: { onPress: () => void; dimmed?: boolean }) {
   const enter = useRef(new Animated.Value(0)).current;
   const press = useRef(new Animated.Value(1)).current;
 
@@ -869,7 +781,7 @@ function AddItemFab({ onPress }: { onPress: () => void }) {
     <Animated.View
       style={[
         styles.fabWrap,
-        { opacity: enter, transform: [{ scale: Animated.multiply(enter, press) }, { rotate }] },
+        { opacity: Animated.multiply(enter, dimmed ? 0.55 : 1), transform: [{ scale: Animated.multiply(enter, press) }, { rotate }] },
       ]}
       pointerEvents="box-none"
     >
@@ -893,21 +805,18 @@ function AddItemFab({ onPress }: { onPress: () => void }) {
 }
 
 // ── Category Story Row (circular avatars, à la Instagram/WhatsApp) ─────
-// Replaces the old pill/bar chips — a bar of same-height rounded rectangles
-// reads as one continuous strip and buries the "add category" affordance as
-// a tiny icon at the end of it. Distinct circles make each category (and
-// the always-first, always-visible Add circle) its own unmistakable tappable
-// unit, and keep the category photo itself the focal point of each one.
+// Read-only filter strip — categories are master data the vendor browses
+// and selects, never creates or edits here (long-press-to-edit was removed
+// along with vendor category management; see categoryService.ts).
 
 function CategoryCircle({
-  label, imageUri, icon, selected, onPress, onLongPress,
+  label, imageUri, icon, selected, onPress,
 }: {
   label: string;
   imageUri?: string | null;
   icon?: string;
   selected: boolean;
   onPress: () => void;
-  onLongPress?: () => void;
 }) {
   const press = useRef(new Animated.Value(1)).current;
   const handlePressIn  = () => Animated.spring(press, { toValue: 0.9, useNativeDriver: true, speed: 50, bounciness: 6 }).start();
@@ -916,7 +825,6 @@ function CategoryCircle({
   return (
     <TouchableOpacity
       onPress={onPress}
-      onLongPress={onLongPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       activeOpacity={0.85}
@@ -942,43 +850,6 @@ function CategoryCircle({
   );
 }
 
-function AddCategoryCircle({ onPress, pulse }: { onPress: () => void; pulse: boolean }) {
-  const press = useRef(new Animated.Value(1)).current;
-  const pulseScale = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (!pulse) { pulseScale.setValue(1); return; }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseScale, { toValue: 1.1, duration: 650, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        Animated.timing(pulseScale, { toValue: 1, duration: 650, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulse, pulseScale]);
-
-  const handlePressIn  = () => Animated.spring(press, { toValue: 0.9, useNativeDriver: true, speed: 50, bounciness: 6 }).start();
-  const handlePressOut = () => Animated.spring(press, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 9 }).start();
-
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      activeOpacity={0.85}
-      style={styles.storyItem}
-    >
-      <Animated.View style={[styles.storyAddRing, { transform: [{ scale: Animated.multiply(press, pulseScale) }] }]}>
-        <Ionicons name="add" size={24} color={DS.primary} />
-      </Animated.View>
-      <Text style={[styles.storyLabel, pulse && styles.storyLabelPulse]} numberOfLines={1}>
-        Add
-      </Text>
-    </TouchableOpacity>
-  );
-}
-
 // ── Main Screen ───────────────────────────────────────────────────────
 
 const AVAIL_FILTERS: { key: AvailFilter; label: string }[] = [
@@ -990,9 +861,8 @@ const AVAIL_FILTERS: { key: AvailFilter; label: string }[] = [
 export default function MenuScreen() {
   const insets = useSafeAreaInsets();
   const {
-    categories, items, loading, refreshing, refresh,
-    addCategory, editCategory, setCategoryImage, removeCategory,
-    toggleAvailability, addItem, editItem, removeItem,
+    categories, items, loading, refreshing, loadError, refresh,
+    toggleAvailability, addItem, editItem, removeItem, setItemImage,
   } = useMenu();
 
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
@@ -1003,8 +873,6 @@ export default function MenuScreen() {
   const [itemFormVisible, setItemForm] = useState(false);
   const [editingItem, setEditingItem]  = useState<MenuItemResponse | null>(null);
   const [detailItem, setDetailItem]    = useState<MenuItemResponse | null>(null);
-  const [catFormVisible, setCatForm]   = useState(false);
-  const [editingCat, setEditingCat]    = useState<CategoryResponse | null>(null);
 
   const { show: showToast, ToastView } = useToast();
   const { alert, AlertView } = useAppAlert();
@@ -1030,50 +898,19 @@ export default function MenuScreen() {
     });
   }, [items, search, availFilter, selectedCatId]);
 
-  // ── Category handlers ─────────────────────────────────────────────
-
-  // The modal itself drives its own two-step create/photo flow and calls
-  // these three directly — it only reports back here once fully done.
-  const handleCategorySaved = useCallback((message: string) => {
-    showToast(message, 'ok');
-  }, [showToast]);
-
-  const handleCatLongPress = useCallback((cat: CategoryResponse) => {
-    alert(cat.name, undefined, [
-      { text: 'Edit', onPress: () => { setEditingCat(cat); setCatForm(true); } },
-      {
-        text: 'Delete', style: 'destructive',
-        onPress: () => alert(
-          'Delete Category',
-          `Delete "${cat.name}"? Items in this category may be affected.`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Delete', style: 'destructive',
-              onPress: async () => {
-                try {
-                  await removeCategory(cat.id);
-                  if (selectedCatId === cat.id) setSelCatId(null);
-                  showToast('Category deleted', 'err');
-                } catch (err: any) {
-                  alert('Error', err?.message ?? 'Failed to delete category');
-                }
-              },
-            },
-          ],
-        ),
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  }, [removeCategory, selectedCatId, showToast, alert]);
-
   // ── Item handlers ─────────────────────────────────────────────────
+  // (No category handlers here — categories are read-only master data for
+  // this app; see categoryService.ts.)
 
   const handleToggle = useCallback(async (item: MenuItemResponse) => {
     const wasAvail = item.availabilityStatus === 'AVAILABLE';
-    await toggleAvailability(item);
-    showToast(wasAvail ? 'Marked out of stock' : 'Marked available', wasAvail ? 'err' : 'ok');
-  }, [toggleAvailability, showToast]);
+    try {
+      await toggleAvailability(item);
+      showToast(wasAvail ? 'Marked out of stock' : 'Marked available', wasAvail ? 'err' : 'ok');
+    } catch (err) {
+      alert('Error', getUserMessage(err, 'Failed to update availability'));
+    }
+  }, [toggleAvailability, showToast, alert]);
 
   const handleDelete = useCallback((item: MenuItemResponse) => {
     alert('Delete Item', `Remove "${item.name}" permanently?`, [
@@ -1093,21 +930,15 @@ export default function MenuScreen() {
     ]);
   }, [removeItem, showToast, alert]);
 
-  const handleSaveItem = useCallback(async (data: CreateMenuItemRequest) => {
-    try {
-      if (editingItem) {
-        await editItem(editingItem.id, data);
-        showToast('Item updated', 'ok');
-      } else {
-        await addItem(data);
-        showToast('Item added', 'ok');
-      }
-      setItemForm(false);
-      setEditingItem(null);
-    } catch (err: any) {
-      alert('Error', err?.message ?? 'Failed to save item');
-    }
-  }, [editingItem, editItem, addItem, showToast, alert]);
+  // ItemFormModal drives its own create/edit → image-upload sequence and
+  // only reports back here once a save has fully gone through — same
+  // contract as handleCategorySaved above. It also passes the categoryId
+  // that was actually used, so it becomes this session's "last used"
+  // category the next time Add Item opens without explicit context.
+  const handleItemSaved = useCallback((message: string, categoryId: number) => {
+    setLastUsedCategoryId(categoryId);
+    showToast(message, 'ok');
+  }, [showToast]);
 
   const openEditItem = useCallback((item: MenuItemResponse) => {
     setEditingItem(item);
@@ -1115,28 +946,27 @@ export default function MenuScreen() {
     setItemForm(true);
   }, []);
 
+  // Category context is no longer a hard gate — the item form always shows
+  // a pre-filled category (tapped filter chip → last used this session →
+  // first category) with a "Change" affordance, so the vendor never has to
+  // leave the form to pick one first. Only zero *available* categories
+  // still blocks — and categories are Strike-managed master data now, so
+  // there is no "Add Category" escape hatch to offer here anymore.
   const handleAddItemPress = useCallback(() => {
+    if (loadError && categories.length === 0) {
+      alert('Categories Unavailable', "Couldn't load categories — pull down to refresh and try again.");
+      return;
+    }
     if (categories.length === 0) {
       alert(
         'No Categories Yet',
-        'Add a menu category first, then you can add items to it.',
-        [
-          { text: 'Add Category', onPress: () => { setEditingCat(null); setCatForm(true); } },
-          { text: 'Cancel', style: 'cancel' },
-        ],
-      );
-      return;
-    }
-    if (selectedCatId === null) {
-      alert(
-        'Select a Category',
-        'Tap a category above (e.g. "Meals") to choose where this item belongs, then add it.',
+        'Menu categories are managed by Strike. Please contact your administrator to have categories added before you add items.',
       );
       return;
     }
     setEditingItem(null);
     setItemForm(true);
-  }, [categories.length, selectedCatId, alert]);
+  }, [categories.length, loadError, alert]);
 
   // ── Render ────────────────────────────────────────────────────────
 
@@ -1154,49 +984,48 @@ export default function MenuScreen() {
           </View>
         </View>
 
-        {/* First-time hint — only while there are zero categories, since
-            that's exactly when a vendor doesn't yet know where to start. */}
-        {categories.length === 0 && (
-          <View style={styles.catEmptyHintRow}>
-            <Ionicons name="arrow-down" size={13} color={DS.primary} />
-            <Text style={styles.catEmptyHintText}>
-              Tap the + circle below to add your first category
+        {/* Category row — read-only master data. Strike admin owns what
+            appears here; this screen only ever browses and filters by it. */}
+        {loadError && categories.length === 0 ? (
+          <View style={styles.categoryStateBox}>
+            <Ionicons name="cloud-offline-outline" size={16} color={DS.error} />
+            <Text style={styles.categoryStateText}>Couldn't load categories.</Text>
+            <TouchableOpacity onPress={() => refresh()} style={styles.retryPill} activeOpacity={0.8}>
+              <Text style={styles.retryPillText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : !loading && categories.length === 0 ? (
+          <View style={styles.categoryStateBox}>
+            <Ionicons name="pricetags-outline" size={16} color={DS.text3} />
+            <Text style={styles.categoryStateText}>
+              No categories are available yet. Please contact your administrator.
             </Text>
           </View>
-        )}
-
-        {/* Category row — circular avatars. Add is always first (never
-            requires scrolling to find), tap any circle to filter, and
-            press-and-hold a category to edit it. */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.storyRow}
-          style={{ marginBottom: 12 }}
-        >
-          <AddCategoryCircle
-            pulse={categories.length === 0}
-            onPress={() => { setEditingCat(null); setCatForm(true); }}
-          />
-
-          <CategoryCircle
-            label="All"
-            icon="apps"
-            selected={selectedCatId === null}
-            onPress={() => setSelCatId(null)}
-          />
-
-          {categories.map(cat => (
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.storyRow}
+            style={{ marginBottom: 12 }}
+          >
             <CategoryCircle
-              key={cat.id}
-              label={cat.name}
-              imageUri={resolveMediaUrl(cat.imageUrl)}
-              selected={selectedCatId === cat.id}
-              onPress={() => setSelCatId(prev => (prev === cat.id ? null : cat.id))}
-              onLongPress={() => handleCatLongPress(cat)}
+              label="All"
+              icon="apps"
+              selected={selectedCatId === null}
+              onPress={() => setSelCatId(null)}
             />
-          ))}
-        </ScrollView>
+
+            {categories.map(cat => (
+              <CategoryCircle
+                key={cat.id}
+                label={cat.name}
+                imageUri={resolveMediaUrl(cat.imageUrl)}
+                selected={selectedCatId === cat.id}
+                onPress={() => setSelCatId(prev => (prev === cat.id ? null : cat.id))}
+              />
+            ))}
+          </ScrollView>
+        )}
 
         {/* Search */}
         <View style={styles.searchBox}>
@@ -1297,21 +1126,15 @@ export default function MenuScreen() {
       </View>
 
       {/* ── Modals ── */}
-      <CategoryFormModal
-        visible={catFormVisible}
-        initial={editingCat}
-        onCreate={addCategory}
-        onEdit={editCategory}
-        onSetImage={setCategoryImage}
-        onSaved={handleCategorySaved}
-        onClose={() => { setCatForm(false); setEditingCat(null); }}
-      />
       <ItemFormModal
         visible={itemFormVisible}
         initial={editingItem}
         categories={categories}
         defaultCategoryId={selectedCatId}
-        onSave={handleSaveItem}
+        onCreate={addItem}
+        onEdit={editItem}
+        onSetImage={setItemImage}
+        onSaved={handleItemSaved}
         onClose={() => { setItemForm(false); setEditingItem(null); }}
       />
       <DetailSheet
@@ -1322,7 +1145,7 @@ export default function MenuScreen() {
         onDelete={() => detailItem && handleDelete(detailItem)}
       />
 
-      <AddItemFab onPress={handleAddItemPress} />
+      <AddItemFab onPress={handleAddItemPress} dimmed={!!loadError && categories.length === 0} />
 
       <ToastView />
       <AlertView />
@@ -1365,11 +1188,18 @@ const styles = StyleSheet.create({
   catChipThumbPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: DS.primarySoft },
   catChipThumbInitial: { fontSize: 11, fontWeight: '800', color: DS.primary },
 
-  catEmptyHintRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    marginBottom: 8,
+  // Read-only category state — no categories loaded yet, or failed to load
+  categoryStateBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12,
   },
-  catEmptyHintText: { fontSize: 12.5, fontWeight: '600', color: DS.primary },
+  categoryStateText: { flex: 1, fontSize: 12.5, color: DS.text2, lineHeight: 17, fontWeight: '500' },
+  retryPill: {
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
+    backgroundColor: DS.primary,
+  },
+  retryPillText: { fontSize: 12, fontWeight: '700', color: '#fff' },
 
   storyRow: { flexDirection: 'row', gap: 14, paddingRight: 4 },
   storyItem: { alignItems: 'center', width: 64, gap: 6 },
@@ -1383,13 +1213,6 @@ const styles = StyleSheet.create({
   storyImgInitial: { fontSize: 18, fontWeight: '800', color: DS.primary },
   storyLabel:       { fontSize: 11.5, fontWeight: '600', color: DS.text2, textAlign: 'center' },
   storyLabelActive: { color: DS.primary, fontWeight: '700' },
-  storyLabelPulse:  { color: DS.primary, fontWeight: '800' },
-  storyAddRing: {
-    width: 60, height: 60, borderRadius: 30,
-    borderWidth: 2, borderColor: DS.primary, borderStyle: 'dashed',
-    backgroundColor: DS.primarySoft,
-    alignItems: 'center', justifyContent: 'center',
-  },
 
   // Search
   searchBox: {
@@ -1526,8 +1349,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', marginBottom: 20,
   },
   formTitle:  { fontSize: 18, fontWeight: '700', color: DS.text },
-  formTitleContextRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
-  formTitleContext:    { fontSize: 12, fontWeight: '600', color: DS.primary },
   fieldLabel: {
     fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.7,
     color: DS.text3, marginBottom: 6, fontWeight: '600',
@@ -1547,23 +1368,25 @@ const styles = StyleSheet.create({
   typeBtnActive: { borderColor: DS.primary, backgroundColor: DS.primarySoft },
   typeBtnText:   { fontSize: 14, color: DS.text2, fontWeight: '500' },
 
-  // Category picker — item form
+  // Item photo
+  itemImageRow: { marginBottom: 18 },
+
+  // Category — item form summary row + "Change" pill (opens CategorySelectorSheet)
   fieldHint: { fontSize: 12, color: DS.text3, marginTop: -3, marginBottom: 10, lineHeight: 16 },
-  catGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
-  catCard: {
-    width: 88, alignItems: 'center', gap: 6,
-    paddingVertical: 12, paddingHorizontal: 8, borderRadius: 14,
-    borderWidth: 1.5, borderColor: DS.border, backgroundColor: DS.bg,
+  catSummaryRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: DS.bg, borderRadius: 14, padding: 10,
+    borderWidth: 1.5, borderColor: DS.border, marginBottom: 16,
   },
-  catCardActive: { borderColor: DS.primary, backgroundColor: DS.primarySoft },
-  catCardThumb:  { width: 40, height: 40, borderRadius: 20, backgroundColor: DS.surface },
-  catCardText:       { fontSize: 12.5, color: DS.text2, fontWeight: '600', textAlign: 'center' },
-  catCardTextActive: { color: DS.primary },
-  catCardCheck: {
-    position: 'absolute', top: 8, right: 8,
-    width: 16, height: 16, borderRadius: 8,
-    backgroundColor: DS.primary, alignItems: 'center', justifyContent: 'center',
+  catSummaryThumb: { width: 40, height: 40, borderRadius: 20, backgroundColor: DS.surface },
+  catSummaryNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  catSummaryName: { fontSize: 14.5, fontWeight: '700', color: DS.text, flexShrink: 1 },
+  changePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 2,
+    paddingHorizontal: 10, paddingVertical: 7, borderRadius: 20,
+    backgroundColor: DS.primarySoft,
   },
+  changePillText: { fontSize: 12.5, fontWeight: '700', color: DS.primary },
   catEmptyBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: DS.bg, borderRadius: 12, borderWidth: 1, borderColor: DS.border,
@@ -1588,43 +1411,18 @@ const styles = StyleSheet.create({
   },
   saveBtnText: { fontSize: 15, color: '#fff', fontWeight: '700' },
 
-  // Category form sheet — same layout contract as formSheet
-  catFormSheet: {
-    maxHeight: '90%',
-    backgroundColor: DS.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 28,
-    borderTopWidth: 1,
-    borderColor: DS.border,
-    shadowColor: '#000', shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.12, shadowRadius: 20, elevation: 12,
+  // New-item action stack — "Save Item" + "Save & Add Another"
+  formActionsStack: { gap: 10, marginTop: 8 },
+  saveBtnFull: {
+    height: 52, borderRadius: 12,
+    backgroundColor: DS.primary, alignItems: 'center', justifyContent: 'center',
   },
-  catFormHeader: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 22,
+  saveAnotherBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+    height: 48, borderRadius: 12,
+    borderWidth: 1.5, borderColor: DS.primarySoft, backgroundColor: DS.primarySoft,
   },
-  catFormIconWrap: {
-    width: 40, height: 40, borderRadius: 13,
-    backgroundColor: DS.primarySoft, alignItems: 'center', justifyContent: 'center',
-  },
-  catFormTitle:    { fontSize: 18, fontWeight: '800', color: DS.text },
-  catFormSubtitle: { fontSize: 12.5, color: DS.text3, lineHeight: 17, marginTop: 3 },
-
-  catFormImageRow: { alignItems: 'center', marginBottom: 22 },
-  catFormInput: {
-    backgroundColor: DS.bg, borderWidth: 1.5, borderColor: DS.border,
-    borderRadius: 12, color: DS.text, fontSize: 15,
-    paddingHorizontal: 14, paddingVertical: 13, marginBottom: 6,
-  },
-  catFormErrorBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14, marginTop: 6,
-  },
-  catFormErrorText: { flex: 1, fontSize: 12, color: DS.error, lineHeight: 16 },
-
-  catFormActions: { flexDirection: 'row', gap: 10, marginTop: 14 },
-  catFormSaveContent: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  saveAnotherBtnText: { fontSize: 14, color: DS.primary, fontWeight: '700' },
 
   // Detail sheet (no keyboard interaction needed — stays position:absolute)
   detailSheet: {
@@ -1677,6 +1475,10 @@ const styles = StyleSheet.create({
 
   // Body
   detailBody: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32 },
+  detailItemImage: {
+    width: '100%', height: 170, borderRadius: 16,
+    backgroundColor: DS.bg, marginBottom: 18,
+  },
   detailDescCard: {
     backgroundColor: DS.bg, borderRadius: 14, padding: 14,
     marginBottom: 18, borderLeftWidth: 3, borderLeftColor: DS.primary,

@@ -16,10 +16,11 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createCard } from '../../modules/cards/services/cardService';
 import { getMyStore } from '../../modules/store/services/storeService';
-import { fetchCategories, fetchMenuItems } from '../../modules/menu/services/menuService';
+import { fetchMenuItems } from '../../modules/menu/services/menuService';
+import { fetchActiveCategories } from '../../modules/menu/services/categoryService';
 import VegNonVegBadge from '../../modules/menu/components/VegNonVegBadge';
 import type { CreateCardRequest } from '../../modules/cards/types/card.types';
-import type { CategoryResponse, MenuItemResponse } from '../../modules/menu/services/menuService';
+import type { CategoryResponse, MenuItemResponse } from '../../modules/menu/types/menu.types';
 
 const DS = {
   bg: '#F6F7FA', surface: '#FFFFFF', border: '#EAECEF',
@@ -426,7 +427,7 @@ export default function CardCreateScreen() {
       // failure is handled gracefully (Step 2 shows empty state).
       const [storeResult, catsResult] = await Promise.allSettled([
         getMyStore(),
-        fetchCategories(),
+        fetchActiveCategories(),
       ]);
 
       if (storeResult.status === 'rejected') {
@@ -657,7 +658,7 @@ export default function CardCreateScreen() {
             <View style={ss.emptyBox}>
               <Ionicons name="alert-circle-outline" size={20} color={DS.text3} />
               <Text style={ss.emptyText}>
-                No active categories. Add categories in Menu first.
+                No active categories yet. Please contact your administrator.
               </Text>
             </View>
           ) : (
