@@ -32,6 +32,10 @@ const endpoints = {
     timing:     (storeId: number, timingId: number) => `/api/vendor/stores/${storeId}/timings/${timingId}`,
     holidays:   (storeId: number) => `/api/vendor/stores/${storeId}/holidays`,
     holiday:    (storeId: number, holidayId: number) => `/api/vendor/stores/${storeId}/holidays/${holidayId}`,
+    // StoreCategoryController → /api/vendor/store-categories (GET only — this is the
+    // admin-curated list Store.category (a plain string) gets picked from; management
+    // (create/edit/delete) happens only in the admin panel).
+    categories: '/api/vendor/store-categories',
   },
 
   // ── Menu Management ────────────────────────────────────────────────

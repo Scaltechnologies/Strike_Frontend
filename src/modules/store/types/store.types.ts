@@ -96,3 +96,13 @@ export interface StoreHolidayResponse {
   reason: string | null;
   createdAt: string;
 }
+
+// ── Store Categories ────────────────────────────────────────────────────
+
+// Response: GET /api/vendor/store-categories — the admin-curated list
+// Store.category (a plain string, unchanged) gets picked from.
+export interface StoreCategoryOption {
+  id: number;
+  name: string;
+  displayOrder: number | null;
+}

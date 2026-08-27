@@ -14,6 +14,7 @@ import {
   StoreTimingResponse,
   StoreHolidayRequest,
   StoreHolidayResponse,
+  StoreCategoryOption,
 } from '../types/store.types';
 
 // ── Store ───────────────────────────────────────────────────────────────
@@ -143,4 +144,13 @@ export async function addStoreHoliday(
 // DELETE /api/vendor/stores/{storeId}/holidays/{holidayId}
 export async function deleteStoreHoliday(storeId: number, holidayId: number): Promise<void> {
   await axiosInstance.delete(endpoints.store.holiday(storeId, holidayId));
+}
+
+// ── Store Categories ──────────────────────────────────────────────────────
+
+// GET /api/vendor/store-categories — the admin-curated list to pick a
+// store's category from (Store.category itself stays a plain string).
+export async function getStoreCategories(): Promise<StoreCategoryOption[]> {
+  const res = await axiosInstance.get<ApiResponse<StoreCategoryOption[]>>(endpoints.store.categories);
+  return res.data.data ?? [];
 }

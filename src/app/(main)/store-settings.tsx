@@ -18,14 +18,17 @@ import {
   deleteStoreTiming,
   addStoreHoliday,
   deleteStoreHoliday,
+  getStoreCategories,
 } from '../../modules/store/services/storeService';
 import BannerPicker from '../../modules/store/components/BannerPicker';
+import StoreCategorySelectorSheet from '../../modules/store/components/StoreCategorySelectorSheet';
 import { resolveMediaUrl } from '../../core/api/mediaUrl';
 import type {
   StoreResponse,
   StoreTimingResponse,
   StoreHolidayResponse,
   StoreDetailsRequest,
+  StoreCategoryOption,
   DayOfWeek,
   StoreStatus,
 } from '../../modules/store/types/store.types';
@@ -414,6 +417,8 @@ export default function StoreSettingsScreen() {
   const [editEmail, setEditEmail]     = useState('');
   const [editCategory, setEditCategory]     = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [categoryOptions, setCategoryOptions] = useState<StoreCategoryOption[]>([]);
+  const [categorySheetOpen, setCategorySheetOpen] = useState(false);
 
   // ── Status
   const [savingStatus, setSavingStatus] = useState(false);
@@ -457,6 +462,9 @@ export default function StoreSettingsScreen() {
     setEditCategory(store.category ?? '');
     setEditDescription(store.description ?? '');
     setEditing(true);
+    // Best-effort — an empty/failed fetch just means the picker shows nothing
+    // to pick, not a blocker to editing the rest of the store's info.
+    getStoreCategories().then(setCategoryOptions).catch(() => setCategoryOptions([]));
   };
 
   const saveInfo = async () => {
@@ -779,7 +787,6 @@ export default function StoreSettingsScreen() {
                         { label: 'Address *',    value: editAddress,     set: setEditAddress,     placeholder: 'Full address' },
                         { label: 'Phone',        value: editPhone,       set: setEditPhone,       placeholder: '+91 9876543210', kb: 'phone-pad' as const },
                         { label: 'Email',        value: editEmail,       set: setEditEmail,       placeholder: 'store@email.com', kb: 'email-address' as const },
-                        { label: 'Category',     value: editCategory,    set: setEditCategory,    placeholder: 'e.g. Restaurant, Café' },
                       ] as const
                     ).map(f => (
                       <View key={f.label} style={styles.formGroup}>
@@ -795,6 +802,19 @@ export default function StoreSettingsScreen() {
                         />
                       </View>
                     ))}
+                    <View style={styles.formGroup}>
+                      <Text style={styles.formLabel}>Category</Text>
+                      <TouchableOpacity
+                        style={[styles.formInput, styles.categoryPickerRow]}
+                        onPress={() => setCategorySheetOpen(true)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.categoryPickerText, !editCategory && { color: DS.text3 }]} numberOfLines={1}>
+                          {editCategory || 'Select a category'}
+                        </Text>
+                        <Ionicons name="chevron-down" size={16} color={DS.text3} />
+                      </TouchableOpacity>
+                    </View>
                     <View style={styles.formGroup}>
                       <Text style={styles.formLabel}>About</Text>
                       <TextInput
@@ -981,6 +1001,14 @@ export default function StoreSettingsScreen() {
           saving={savingHoliday}
         />
       )}
+
+      <StoreCategorySelectorSheet
+        visible={categorySheetOpen}
+        categories={categoryOptions}
+        selectedName={editCategory}
+        onSelect={(name) => { setEditCategory(name); setCategorySheetOpen(false); }}
+        onClose={() => setCategorySheetOpen(false)}
+      />
     </View>
   );
 }
@@ -1077,6 +1105,10 @@ const styles = StyleSheet.create({
     fontSize: 14, color: DS.text,
   },
   formError: { fontSize: 11, color: DS.error, marginTop: 4 },
+  categoryPickerRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  categoryPickerText: { flex: 1, fontSize: 14, color: DS.text },
   editBtns: {
     flexDirection: 'row', gap: 10,
     paddingHorizontal: 16, paddingBottom: 16, paddingTop: 8,
