@@ -29,6 +29,13 @@ export interface VerifyOtpRequest {
   otp: string;
 }
 
+// Backend: POST /api/auth/vendor/firebase-verify body — the ONLY thing sent
+// to the backend for the Firebase login path. No mobileNumber/otp: the phone
+// number is embedded (and already verified) inside the Firebase ID token.
+export interface FirebaseVerifyRequest {
+  idToken: string;
+}
+
 // Backend: POST /api/auth/vendor/register body
 export interface RegisterVendorRequest {
   hotelName: string;

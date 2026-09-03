@@ -17,10 +17,15 @@ interface NotificationState {
   error: string | null;
   pushPermission: PushPermissionState;
   pushToken: string | null;
+  /** Backend's numeric PushDevice id for the current token — deregistration is by id, not token. */
+  pushDeviceId: number | null;
   bannerNotification: NotificationResponse | null;
+  /** CARD_REQUEST / REDEMPTION_REQUEST arrivals, shown one at a time via UrgentAlertSheet so
+   *  several rapid requests never stack — dedup'd by id so a duplicate FCM delivery never queues twice. */
+  urgentQueue: NotificationResponse[];
 }
 
-let state: NotificationState = {
+const initialState: NotificationState = {
   items: [],
   unreadCount: 0,
   loading: false,
@@ -28,8 +33,12 @@ let state: NotificationState = {
   error: null,
   pushPermission: 'undetermined',
   pushToken: null,
+  pushDeviceId: null,
   bannerNotification: null,
+  urgentQueue: [],
 };
+
+let state: NotificationState = { ...initialState };
 
 const listeners = new Set<Listener>();
 
@@ -60,7 +69,7 @@ export function setNotifications(items: NotificationResponse[]): void {
   state = {
     ...state,
     items,
-    unreadCount: items.filter(n => !n.read).length,
+    unreadCount: items.filter(n => !n.isRead).length,
     loading: false,
     refreshing: false,
     error: null,
@@ -76,8 +85,8 @@ export function setUnreadCount(count: number): void {
 export function markReadLocally(id: number): void {
   state = {
     ...state,
-    items: state.items.map(n => (n.id === id ? { ...n, read: true } : n)),
-    unreadCount: Math.max(0, state.items.find(n => n.id === id && !n.read) ? state.unreadCount - 1 : state.unreadCount),
+    items: state.items.map(n => (n.id === id ? { ...n, isRead: true } : n)),
+    unreadCount: Math.max(0, state.items.find(n => n.id === id && !n.isRead) ? state.unreadCount - 1 : state.unreadCount),
   };
   emit();
 }
@@ -85,7 +94,7 @@ export function markReadLocally(id: number): void {
 export function markAllReadLocally(): void {
   state = {
     ...state,
-    items: state.items.map(n => ({ ...n, read: true })),
+    items: state.items.map(n => ({ ...n, isRead: true })),
     unreadCount: 0,
   };
   emit();
@@ -97,7 +106,7 @@ export function prependNotification(n: NotificationResponse): void {
   state = {
     ...state,
     items: [n, ...state.items],
-    unreadCount: state.unreadCount + (n.read ? 0 : 1),
+    unreadCount: state.unreadCount + (n.isRead ? 0 : 1),
     bannerNotification: n,
   };
   emit();
@@ -108,28 +117,32 @@ export function clearBanner(): void {
   emit();
 }
 
+// CARD_REQUEST / REDEMPTION_REQUEST arrivals go through this queue instead of the
+// lighter bannerNotification — UrgentAlertSheet always renders urgentQueue[0].
+export function enqueueUrgent(n: NotificationResponse): void {
+  if (state.urgentQueue.some(existing => existing.id === n.id)) return;
+  state = { ...state, urgentQueue: [...state.urgentQueue, n] };
+  emit();
+}
+
+export function dequeueUrgent(): void {
+  state = { ...state, urgentQueue: state.urgentQueue.slice(1) };
+  emit();
+}
+
 export function setPushPermission(pushPermission: PushPermissionState): void {
   state = { ...state, pushPermission };
   emit();
 }
 
-export function setPushToken(pushToken: string | null): void {
-  state = { ...state, pushToken };
+export function setPushToken(pushToken: string | null, pushDeviceId: number | null = state.pushDeviceId): void {
+  state = { ...state, pushToken, pushDeviceId };
   emit();
 }
 
 // Called on logout / session expiry so stale badge counts don't leak into the
 // next login on a shared device.
 export function resetNotificationStore(): void {
-  state = {
-    items: [],
-    unreadCount: 0,
-    loading: false,
-    refreshing: false,
-    error: null,
-    pushPermission: 'undetermined',
-    pushToken: null,
-    bannerNotification: null,
-  };
+  state = { ...initialState };
   emit();
 }

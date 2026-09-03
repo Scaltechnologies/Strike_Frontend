@@ -17,7 +17,6 @@ import {
   MenuItemResponse,
   CreateMenuItemRequest,
 } from '../../../modules/menu/hooks/useMenu';
-import ItemImagePicker from '../../../modules/menu/components/ItemImagePicker';
 import CategorySelectorSheet from '../../../modules/menu/components/CategorySelectorSheet';
 import { getLastUsedCategoryId, setLastUsedCategoryId } from '../../../modules/menu/state/lastUsedCategory';
 import { resolveMediaUrl } from '../../../core/api/mediaUrl';
@@ -276,7 +275,6 @@ interface ItemFormProps {
   defaultCategoryId?: number | null;
   onCreate: (data: CreateMenuItemRequest) => Promise<MenuItemResponse>;
   onEdit: (id: number, data: Partial<CreateMenuItemRequest>) => Promise<MenuItemResponse>;
-  onSetImage: (id: number, imageUri: string) => Promise<MenuItemResponse>;
   onSaved: (message: string, categoryId: number) => void;
   onClose: () => void;
 }
@@ -288,13 +286,11 @@ interface ItemFormProps {
 // adding several items to the same category is a single fast loop — see
 // PART 11-13 of the redesign brief this screen implements.
 function ItemFormModal({
-  visible, initial, categories, defaultCategoryId, onCreate, onEdit, onSetImage, onSaved, onClose,
+  visible, initial, categories, defaultCategoryId, onCreate, onEdit, onSaved, onClose,
 }: ItemFormProps) {
   const [name, setName]           = useState('');
   const [price, setPrice]         = useState('');
   const [desc, setDesc]           = useState('');
-  const [image, setImage]         = useState(''); // existing remote imageUrl (edit mode)
-  const [pickedUri, setPickedUri] = useState<string | null>(null); // freshly picked local uri
   const [categoryId, setCatId]    = useState<number | null>(null);
   const [itemType, setItemType]   = useState<'VEG' | 'NON_VEG' | undefined>(undefined);
   const [available, setAvailable] = useState(true);
@@ -308,8 +304,6 @@ function ItemFormModal({
       setName(initial?.name ?? '');
       setPrice(initial?.price != null ? String(initial.price) : '');
       setDesc(initial?.description ?? '');
-      setImage(initial?.imageUrl ?? '');
-      setPickedUri(null);
       setCatId(initial?.categoryId ?? defaultCategoryId ?? getLastUsedCategoryId() ?? (categories[0]?.id ?? null));
       setItemType(initial?.itemType);
       setAvailable((initial?.availabilityStatus ?? 'AVAILABLE') === 'AVAILABLE');
@@ -324,8 +318,6 @@ function ItemFormModal({
     setName('');
     setPrice('');
     setDesc('');
-    setImage('');
-    setPickedUri(null);
     setItemType(undefined);
     setAvailable(true);
     requestAnimationFrame(() => nameRef.current?.focus());
@@ -352,18 +344,7 @@ function ItemFormModal({
 
     setSaving(true);
     try {
-      const saved = initial ? await onEdit(initial.id, payload) : await onCreate(payload);
-
-      if (pickedUri) {
-        try {
-          await onSetImage(saved.id, pickedUri);
-        } catch (imgErr) {
-          const reason = getUserMessage(imgErr, 'please try again');
-          onSaved(`${initial ? 'Item updated' : 'Item added'} — but the photo failed to upload (${reason}). Try again from edit.`, categoryId);
-          if (addAnother && !initial) { resetForAnother(); } else { onClose(); }
-          return;
-        }
-      }
+      initial ? await onEdit(initial.id, payload) : await onCreate(payload);
 
       onSaved(initial ? 'Item updated' : 'Item added', categoryId);
       if (addAnother && !initial) {
@@ -379,7 +360,6 @@ function ItemFormModal({
   };
 
   const selectedCategory = categories.find(c => c.id === categoryId) ?? null;
-  const previewImageUri = pickedUri ?? resolveMediaUrl(image);
 
   return (
     <>
@@ -427,11 +407,6 @@ function ItemFormModal({
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingBottom: 8 }}
           >
-            {/* Food photo */}
-            <View style={styles.itemImageRow}>
-              <ItemImagePicker uri={previewImageUri} onPick={setPickedUri} />
-            </View>
-
             {/* Category — always a pre-filled summary, never a blank picker.
                 Tapping it opens the shared CategorySelectorSheet; the vendor
                 only ever touches this when they actually want to change it. */}
@@ -862,7 +837,7 @@ export default function MenuScreen() {
   const insets = useSafeAreaInsets();
   const {
     categories, items, loading, refreshing, loadError, refresh,
-    toggleAvailability, addItem, editItem, removeItem, setItemImage,
+    toggleAvailability, addItem, editItem, removeItem,
   } = useMenu();
 
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
@@ -930,11 +905,10 @@ export default function MenuScreen() {
     ]);
   }, [removeItem, showToast, alert]);
 
-  // ItemFormModal drives its own create/edit → image-upload sequence and
-  // only reports back here once a save has fully gone through — same
-  // contract as handleCategorySaved above. It also passes the categoryId
-  // that was actually used, so it becomes this session's "last used"
-  // category the next time Add Item opens without explicit context.
+  // ItemFormModal only reports back here once a save has fully gone through.
+  // It also passes the categoryId that was actually used, so it becomes this
+  // session's "last used" category the next time Add Item opens without
+  // explicit context.
   const handleItemSaved = useCallback((message: string, categoryId: number) => {
     setLastUsedCategoryId(categoryId);
     showToast(message, 'ok');
@@ -1133,7 +1107,6 @@ export default function MenuScreen() {
         defaultCategoryId={selectedCatId}
         onCreate={addItem}
         onEdit={editItem}
-        onSetImage={setItemImage}
         onSaved={handleItemSaved}
         onClose={() => { setItemForm(false); setEditingItem(null); }}
       />
@@ -1369,7 +1342,6 @@ const styles = StyleSheet.create({
   typeBtnText:   { fontSize: 14, color: DS.text2, fontWeight: '500' },
 
   // Item photo
-  itemImageRow: { marginBottom: 18 },
 
   // Category — item form summary row + "Change" pill (opens CategorySelectorSheet)
   fieldHint: { fontSize: 12, color: DS.text3, marginTop: -3, marginBottom: 10, lineHeight: 16 },

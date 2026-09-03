@@ -6,9 +6,12 @@ const endpoints = {
   // ── Authentication ─────────────────────────────────────────────────
   auth: {
     vendor: {
-      register: '/api/auth/vendor/register',
-      login:    '/api/auth/vendor/login',
-      verify:   '/api/auth/vendor/verify',
+      register:      '/api/auth/vendor/register',
+      login:         '/api/auth/vendor/login',
+      verify:        '/api/auth/vendor/verify',
+      // Firebase Phone Auth ID token exchange — the primary UI login path.
+      // register/login/verify above remain the legacy fallback path.
+      firebaseVerify: '/api/auth/vendor/firebase-verify',
     },
     refresh: '/api/auth/refresh',
     logout:  '/api/auth/logout',
@@ -54,9 +57,6 @@ const endpoints = {
     items:             '/api/menu/items',
     item:              (itemId: number) => `/api/menu/items/${itemId}`,
     itemsByCategory:   (categoryId: number) => `/api/menu/items/by-category/${categoryId}`,
-    // Confirmed live on vendor-service. menuService.uploadMenuItemImage() still degrades
-    // gracefully on failure (item still saves) since a photo upload is a secondary step.
-    itemImage:         (itemId: number) => `/api/menu/items/${itemId}/image`,
   },
 
   // ── Card Management ────────────────────────────────────────────────
@@ -122,15 +122,15 @@ const endpoints = {
   },
 
   // ── Notifications ─────────────────────────────────────────────────
-  // VendorNotificationController → /api/vendor/notifications (auth required, VENDOR role)
-  // NOT YET IMPLEMENTED BACKEND-SIDE — this is the proposed contract; see notifications plan.
+  // NotificationSelfServiceController → /api/notifications/me (auth required — scoped to
+  // the authenticated principal, VENDOR included; notification-service, not vendor-service).
   notification: {
-    list:                '/api/vendor/notifications',              // GET, paginated: ?page=&size=&unreadOnly=
-    unreadCount:         '/api/vendor/notifications/unread-count',  // GET
-    markRead:            (id: number | string) => `/api/vendor/notifications/${id}/read`, // PATCH
-    markAllRead:         '/api/vendor/notifications/read-all',      // PATCH
-    registerPushToken:   '/api/vendor/notifications/push-token',    // POST
-    deregisterPushToken: '/api/vendor/notifications/push-token',    // DELETE
+    list:                '/api/notifications/me',                          // GET, paginated: ?page=&size=
+    unreadCount:         '/api/notifications/me/unread-count',             // GET -> { unreadCount }
+    markRead:            (id: number | string) => `/api/notifications/me/${id}/read`, // PATCH
+    markAllRead:         '/api/notifications/me/read-all',                 // PATCH -> { updated }
+    registerPushToken:   '/api/notifications/me/devices',                  // POST -> PushDevice { id, ... }
+    deregisterPushToken: (deviceId: number | string) => `/api/notifications/me/devices/${deviceId}`, // DELETE
   },
 
   // ── Withdrawals / Wallet ──────────────────────────────────────────────

@@ -2,13 +2,21 @@
 
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { sendOtp, verifyOtp, registerVendor } from '../services/authService';
+// authService.sendOtp / verifyOtp (legacy POST /api/auth/vendor/login|verify)
+// are intentionally not imported here — the Firebase path below replaces
+// them as the UI path, but both remain defined and exported in authService
+// as the preserved compatibility fallback.
+import { registerVendor, firebaseVerify } from '../services/authService';
+import { sendPhoneOtp, confirmPhoneOtp, getFirebaseIdToken } from '../../../core/firebase/firebaseAuth';
 import { saveTokens } from '../../../core/storage/secureStorage';
 import { RegisterVendorRequest } from '../types/auth.types';
 import { uploadStoreBanner } from '../../store/services/storeService';
 
 // ── Send OTP Hook (Login flow) ────────────────────────────────────────
-// POST /api/auth/vendor/login — vendor must already be ACTIVE
+// Firebase Phone Auth — sends a real SMS via signInWithPhoneNumber() and
+// keeps the resulting ConfirmationResult pending for the OTP screen.
+// (Legacy authService.sendOtp / POST /api/auth/vendor/login is preserved
+// below, unused by this hook, as the compatibility fallback path.)
 export const useSendOtp = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +25,7 @@ export const useSendOtp = () => {
     try {
       setLoading(true);
       setError(null);
-      await sendOtp(mobileNumber);
+      await sendPhoneOtp(mobileNumber);
       router.push({
         pathname: '/(auth)/otp',
         params: { phoneNumber: mobileNumber },
@@ -32,12 +40,42 @@ export const useSendOtp = () => {
   return { handleSendOtp, loading, error };
 };
 
+// ── Resend OTP Hook (OTP screen) ──────────────────────────────────────
+// Re-triggers Firebase Phone Auth for the same number, replacing the pending
+// ConfirmationResult. Does not navigate — used from the OTP screen itself.
+export const useResendOtp = () => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleResend = async (mobileNumber: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      await sendPhoneOtp(mobileNumber);
+    } catch (err: any) {
+      setError(err.message || 'Failed to resend OTP');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { handleResend, loading, error };
+};
+
 // ── Verify OTP Hook ───────────────────────────────────────────────────
-// POST /api/auth/vendor/verify — navigates based on vendor status
+// Firebase confirms the OTP client-side, then the Firebase ID token is
+// exchanged exactly once for the backend Vendor JWT via
+// POST /api/auth/vendor/firebase-verify. Navigation/status handling below is
+// unchanged from the legacy flow.
 export const useVerifyOtp = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // mobileNumber is accepted for call-site compatibility with the OTP screen
+  // but is not sent anywhere — the verified phone number is already embedded
+  // in the Firebase ID token.
+  //
   // bannerUri: local device image picked on the registration screen, carried
   // through as a route param since no auth token exists until this call
   // succeeds. Uploaded best-effort right after login — a failure here must
@@ -47,12 +85,14 @@ export const useVerifyOtp = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await verifyOtp(mobileNumber, otp);
 
-      console.log('VERIFY RESPONSE =>', JSON.stringify(response, null, 2));
+      const firebaseUser = await confirmPhoneOtp(otp);
+      const idToken = await getFirebaseIdToken(firebaseUser);
+      const response = await firebaseVerify(idToken);
 
       if (response.status === 'ACTIVE') {
-        // Map backend `token` field to `accessToken` for secureStorage
+        // Map backend `token` field to `accessToken` for secureStorage.
+        // The Firebase ID token itself is discarded here — never stored.
         await saveTokens({ accessToken: response.token, refreshToken: response.refreshToken });
 
         if (bannerUri) {

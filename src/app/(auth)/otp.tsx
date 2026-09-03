@@ -6,9 +6,11 @@ import {
 import { useLocalSearchParams } from 'expo-router';
 import Text from '../../components/Text';
 import TextInput, { type TextInputRef } from '../../components/TextInput';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { useVerifyOtp } from '../../modules/auth/hooks/useAuth';
+import { useVerifyOtp, useResendOtp } from '../../modules/auth/hooks/useAuth';
+
+const RESEND_COOLDOWN_SECONDS = 30;
 
 const DS = {
   bg:          '#F6F7FA',
@@ -29,8 +31,31 @@ const BOX_SIZE = (width - 48 - (OTP_LENGTH - 1) * BOX_GAP) / OTP_LENGTH;
 export default function OtpScreen() {
   const { phoneNumber, bannerUri } = useLocalSearchParams<{ phoneNumber: string; bannerUri?: string }>();
   const { handleVerifyOtp, loading, error } = useVerifyOtp();
+  const { handleResend, loading: resending, error: resendError } = useResendOtp();
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
+  const [resendCooldown, setResendCooldown] = useState(0);
   const inputs = useRef<(TextInputRef | null)[]>([]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown(c => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
+
+  const onResend = async () => {
+    if (resendCooldown > 0 || resending) return;
+    try {
+      await handleResend(phoneNumber);
+      setOtp(Array(OTP_LENGTH).fill(''));
+      inputs.current[0]?.focus();
+    } catch {
+      // resendError below already surfaces this to the user
+    } finally {
+      // Cooldown applies whether resend succeeded or failed, to prevent
+      // spamming Firebase's SMS quota on repeated failures too.
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
+    }
+  };
 
   const handleChange = (text: string, index: number) => {
     if (!/^\d*$/.test(text)) return;
@@ -102,12 +127,26 @@ export default function OtpScreen() {
           </View>
         )}
 
-        <TouchableOpacity style={styles.resendRow} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.resendRow}
+          activeOpacity={0.7}
+          onPress={onResend}
+          disabled={resendCooldown > 0 || resending}
+        >
           <Text style={styles.resendText}>
             Didn't receive?{' '}
-            <Text style={styles.resendLink}>Resend OTP</Text>
+            <Text style={[styles.resendLink, (resendCooldown > 0 || resending) && styles.resendLinkDisabled]}>
+              {resending ? 'Sending…' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend OTP'}
+            </Text>
           </Text>
         </TouchableOpacity>
+
+        {!!resendError && (
+          <View style={styles.errorRow}>
+            <Ionicons name="alert-circle-outline" size={14} color={DS.primary} />
+            <Text style={styles.errorText}>{resendError}</Text>
+          </View>
+        )}
 
         <TouchableOpacity
           style={[styles.primaryBtn, !canSubmit && styles.primaryBtnDisabled]}
@@ -167,9 +206,10 @@ const styles = StyleSheet.create({
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
   errorText: { fontSize: 13, color: DS.primary, flex: 1 },
 
-  resendRow:  { alignItems: 'center', marginBottom: 28 },
+  resendRow:  { alignItems: 'center', marginBottom: 16 },
   resendText: { fontSize: 14, color: DS.text2 },
   resendLink: { color: DS.primary, fontWeight: '600' },
+  resendLinkDisabled: { color: DS.text3 },
 
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',

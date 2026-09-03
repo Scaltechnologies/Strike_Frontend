@@ -391,6 +391,7 @@ export default function CardCreateScreen() {
   const [categories, setCategories]   = useState<CategoryResponse[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [dataError, setDataError]     = useState<string | null>(null);
+  const [itemsLoadFailed, setItemsLoadFailed] = useState(false);
   const [submitting, setSubmitting]   = useState(false);
   const [successDetails, setSuccessDetails] = useState<SuccessDetails | null>(null);
 
@@ -404,6 +405,16 @@ export default function CardCreateScreen() {
   const step1Ok = name.trim().length > 0 && price > 0 && bonusOk && days > 0;
   const step2Ok = selectedCatIds.length > 0;
   const step3Ok = selectedItemIds.length > 0;
+
+  // Only categories the vendor actually has menu items under are selectable in Step 2 —
+  // this mirrors vendor-service's InternalCategoryController.validateCategoryIds exactly
+  // (a category must be ACTIVE *and* used by at least one of this store's menu items), so a
+  // category picked here can never fail POST /api/cards's server-side validation later.
+  // If the items fetch itself failed (network issue, not "vendor has zero items"), fall back
+  // to the unfiltered list rather than incorrectly implying every category is empty.
+  const categoriesWithItems = itemsLoadFailed
+    ? categories
+    : categories.filter(cat => allItems.some(item => item.categoryId === cat.id));
 
   // Items in selected categories
   const catItems = allItems.filter(i => selectedCatIds.includes(i.categoryId));
@@ -423,11 +434,13 @@ export default function CardCreateScreen() {
     setLoadingData(true);
     setDataError(null);
     try {
-      // Run in parallel; store failure blocks the form (storeId required), category
-      // failure is handled gracefully (Step 2 shows empty state).
-      const [storeResult, catsResult] = await Promise.allSettled([
+      // Run in parallel; store failure blocks the form (storeId required), category and
+      // item failures are handled gracefully (Step 2 falls back to the unfiltered category
+      // list rather than blocking the vendor over a transient network error).
+      const [storeResult, catsResult, itemsResult] = await Promise.allSettled([
         getMyStore(),
         fetchActiveCategories(),
+        fetchMenuItems(),
       ]);
 
       if (storeResult.status === 'rejected') {
@@ -444,6 +457,12 @@ export default function CardCreateScreen() {
       if (catsResult.status === 'fulfilled') {
         setCategories(catsResult.value.filter(c => c.status === 'ACTIVE'));
       }
+      if (itemsResult.status === 'fulfilled') {
+        setAllItems(itemsResult.value);
+        setItemsLoadFailed(false);
+      } else {
+        setItemsLoadFailed(true);
+      }
     } finally {
       setLoadingData(false);
     }
@@ -452,12 +471,14 @@ export default function CardCreateScreen() {
   useEffect(() => { loadInitialData(); }, [loadInitialData]);
 
   const loadItems = useCallback(async () => {
-    if (allItems.length > 0) return;
+    if (allItems.length > 0 && !itemsLoadFailed) return;
     setLoadingItems(true);
     try {
       const items = await fetchMenuItems();
       setAllItems(items);
+      setItemsLoadFailed(false);
     } catch (err: any) {
+      setItemsLoadFailed(true);
       Alert.alert('Failed to load items', err?.message ?? 'Please retry.', [
         { text: 'Retry', onPress: loadItems },
         { text: 'Skip', onPress: () => setStep(4) },
@@ -465,7 +486,7 @@ export default function CardCreateScreen() {
     } finally {
       setLoadingItems(false);
     }
-  }, [allItems.length]);
+  }, [allItems.length, itemsLoadFailed]);
 
   // ── Navigation ─────────────────────────────────────────────────────
   const goNext = () => {
@@ -496,6 +517,12 @@ export default function CardCreateScreen() {
   // ── Submit ─────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!storeId || submitting) return;
+    // Defense in depth: Step 2 already only offers categories with at least one of this
+    // store's items, but re-filter here too in case allItems failed to load earlier and
+    // Step 2 fell back to the unfiltered list — a category with zero items at this store
+    // always fails vendor-service's validateCategoryIds (400 "Invalid or inactive menu
+    // category IDs"), so it must never be sent regardless of how it got selected.
+    const validCategoryIds = selectedCatIds.filter(id => allItems.some(item => item.categoryId === id));
     const payload: CreateCardRequest = {
       storeId,
       name:               name.trim(),
@@ -503,7 +530,7 @@ export default function CardCreateScreen() {
       cardPrice:          price,
       walletAmount:       wallet,
       validityInDays:     days,
-      categoryIds:        selectedCatIds,
+      categoryIds:        validCategoryIds,
       eligibleMenuItemIds: selectedItemIds.length > 0 ? selectedItemIds : undefined,
     };
     setSubmitting(true);
@@ -515,7 +542,7 @@ export default function CardCreateScreen() {
         wallet,
         bonus,
         days,
-        catCount: selectedCatIds.length,
+        catCount: validCategoryIds.length,
         itemCount: selectedItemIds.length,
       });
     } catch (err: any) {
@@ -661,10 +688,17 @@ export default function CardCreateScreen() {
                 No active categories yet. Please contact your administrator.
               </Text>
             </View>
+          ) : categoriesWithItems.length === 0 ? (
+            <View style={ss.emptyBox}>
+              <Ionicons name="restaurant-outline" size={20} color={DS.text3} />
+              <Text style={ss.emptyText}>
+                You haven't added any menu items yet. Add items from the Menu tab first, then come back to create a card.
+              </Text>
+            </View>
           ) : (
             <>
               <View style={ss.chipGrid}>
-                {categories.map(cat => {
+                {categoriesWithItems.map(cat => {
                   const sel = selectedCatIds.includes(cat.id);
                   return (
                     <TouchableOpacity

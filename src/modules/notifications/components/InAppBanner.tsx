@@ -60,7 +60,7 @@ export default function InAppBanner({ notification }: { notification: Notificati
         </View>
         <View style={styles.body}>
           <Text style={styles.title} numberOfLines={1}>{notification.title}</Text>
-          <Text style={styles.desc} numberOfLines={2}>{notification.body}</Text>
+          <Text style={styles.desc} numberOfLines={2}>{notification.message}</Text>
         </View>
         <TouchableOpacity onPress={dismiss} hitSlop={8}>
           <Ionicons name="close" size={16} color="#9BA3AF" />

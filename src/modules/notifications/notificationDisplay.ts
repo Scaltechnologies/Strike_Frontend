@@ -22,6 +22,10 @@ export interface NotificationDisplay {
 
 export function getNotificationDisplay(type: NotificationType): NotificationDisplay {
   switch (type) {
+    case 'CARD_REQUEST':
+      return { icon: 'card-outline', bg: PRIMARY_SOFT, fg: PRIMARY };
+    case 'REDEMPTION_REQUEST':
+      return { icon: 'alert-circle', bg: WARNING_SOFT, fg: WARNING };
     case 'REDEMPTION_REQUESTED':
       return { icon: 'time-outline', bg: PRIMARY_SOFT, fg: PRIMARY };
     case 'REDEMPTION_APPROVED':

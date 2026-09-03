@@ -1,8 +1,8 @@
 // src/modules/notifications/push/notificationRouting.ts
-// The single place that maps a notification's type + data ids to a real
-// expo-router route. Backend only ever sends type-specific ids (see
-// notification.types.ts) — never a raw path — so a future route rename here
-// never requires a backend change.
+// Resolves where a notification tap should navigate. Prefers a server-supplied deep
+// link (in-app's `actionUrl`, or the FCM push payload's `data.deepLink`) so the backend
+// can point at a specific request without a frontend release — falls back to a static
+// per-type route only when no explicit link was sent.
 
 import { NotificationResponse } from '../types/notification.types';
 
@@ -11,14 +11,25 @@ export interface NotificationTarget {
   params?: Record<string, string>;
 }
 
-export function resolveNotificationTarget(n: NotificationResponse): NotificationTarget | null {
+// Deep links are sent as "/(main)/redemption-detail?id=123" — split into expo-router's
+// separate pathname/params shape.
+function parseDeepLink(link: string): NotificationTarget {
+  const [pathname, query] = link.split('?');
+  if (!query) return { pathname };
+  const params: Record<string, string> = {};
+  new URLSearchParams(query).forEach((value, key) => { params[key] = value; });
+  return { pathname, params };
+}
+
+function staticTargetFor(n: NotificationResponse): NotificationTarget | null {
   switch (n.type) {
+    case 'CARD_REQUEST':
+      return { pathname: '/(main)/pay-at-store' };
+    case 'REDEMPTION_REQUEST':
     case 'REDEMPTION_REQUESTED':
     case 'REDEMPTION_APPROVED':
     case 'REDEMPTION_REJECTED':
-      return n.data.redemptionId
-        ? { pathname: '/(main)/redemption-detail', params: { id: n.data.redemptionId } }
-        : { pathname: '/(main)/redemption-history' };
+      return { pathname: '/(main)/redemption-history' };
     case 'TRANSACTION_NEW':
       return { pathname: '/(main)/transactions' };
     case 'WITHDRAWAL_STATUS_UPDATED':
@@ -31,4 +42,9 @@ export function resolveNotificationTarget(n: NotificationResponse): Notification
     default:
       return null;
   }
+}
+
+export function resolveNotificationTarget(n: NotificationResponse): NotificationTarget | null {
+  if (n.actionUrl) return parseDeepLink(n.actionUrl);
+  return staticTargetFor(n);
 }

@@ -68,7 +68,7 @@ export default function NotificationsScreen() {
   ]);
 
   function handlePress(n: NotificationResponse) {
-    if (!n.read) markAsRead(n.id);
+    if (!n.isRead) markAsRead(n.id);
     const target = resolveNotificationTarget(n);
     if (target) router.push({ pathname: target.pathname as any, params: target.params });
   }

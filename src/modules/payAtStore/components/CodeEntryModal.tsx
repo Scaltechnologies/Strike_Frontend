@@ -2,7 +2,7 @@
 // paymentId up front — unlike verify-qr, which resolves the payment from the token alone; see
 // VendorPayAtStoreController.java). Opened by tapping a row in the Pending list.
 import { useEffect, useRef, useState } from 'react';
-import { Modal, View, TouchableOpacity, TextInput, Animated, ActivityIndicator, StyleSheet } from 'react-native';
+import { Modal, View, TouchableOpacity, Animated, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Text from '../../../components/Text';
 import { usePayAtStore } from '../store/PayAtStoreContext';
@@ -59,11 +59,9 @@ export default function CodeEntryModal({ payment, visible, onClose, onVerified }
   const [error, setError] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
   const shakeX = useRef(new Animated.Value(0)).current;
-  const inputRef = useRef<TextInput>(null);
-  // React state updates aren't synchronous — two onChangeText events firing back-to-back (Android
-  // IME/autofill routinely delivers duplicates) can both read `verifying` as still false before
-  // either commits `setVerifying(true)`, firing verifyCode twice concurrently for the same
-  // payment. A ref flips synchronously, closing that window.
+  // Two rapid keypad taps landing before either commits `setVerifying(true)`
+  // could both pass the `!verifyingRef.current` check below. A ref flips
+  // synchronously, closing that window.
   const verifyingRef = useRef(false);
 
   useEffect(() => {
@@ -76,11 +74,6 @@ export default function CodeEntryModal({ payment, visible, onClose, onVerified }
     }
   }, [visible]);
 
-  // Modal's onShow fires once the native presentation animation actually
-  // finishes, unlike a guessed setTimeout delay — focusing before that on
-  // Android silently no-ops because the input isn't attached to a window yet.
-  const focusInput = () => inputRef.current?.focus();
-
   const runShake = () => {
     shakeX.setValue(0);
     Animated.sequence([
@@ -91,10 +84,7 @@ export default function CodeEntryModal({ payment, visible, onClose, onVerified }
     ]).start();
   };
 
-  const handleChange = async (text: string) => {
-    const clean = text.replace(/\D/g, '').slice(0, CODE_LENGTH);
-    setDigits(clean);
-    setError(null);
+  const submitIfComplete = async (clean: string) => {
     if (clean.length === CODE_LENGTH && payment && !verifyingRef.current) {
       verifyingRef.current = true;
       setVerifying(true);
@@ -116,6 +106,20 @@ export default function CodeEntryModal({ payment, visible, onClose, onVerified }
     }
   };
 
+  const handleKeyTap = (digit: string) => {
+    if (verifying || locked || digits.length >= CODE_LENGTH) return;
+    const next = digits + digit;
+    setDigits(next);
+    setError(null);
+    submitIfComplete(next);
+  };
+
+  const handleBackspace = () => {
+    if (verifying || locked || digits.length === 0) return;
+    setDigits(digits.slice(0, -1));
+    setError(null);
+  };
+
   if (!payment) return null;
 
   return (
@@ -124,7 +128,6 @@ export default function CodeEntryModal({ payment, visible, onClose, onVerified }
       animationType="slide"
       transparent
       onRequestClose={verifying ? undefined : onClose}
-      onShow={focusInput}
     >
       <View style={styles.overlay}>
         <TouchableOpacity style={{ flex: 1 }} onPress={verifying ? undefined : onClose} activeOpacity={1} disabled={verifying} />
@@ -137,38 +140,20 @@ export default function CodeEntryModal({ payment, visible, onClose, onVerified }
           <Text style={styles.subtitle}>Ask the customer for the 6-digit code shown on their screen.</Text>
 
           <Animated.View style={{ transform: [{ translateX: shakeX }] }}>
-            <View style={styles.digitsWrap}>
-              <View style={styles.digitsRow} pointerEvents="none">
-                {Array.from({ length: CODE_LENGTH }).map((_, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.digitBox,
-                      i < digits.length && styles.digitBoxFilled,
-                      i === digits.length && !verifying && !locked && styles.digitBoxActive,
-                      error && !locked && styles.digitBoxError,
-                    ]}
-                  >
-                    <Text style={styles.digitText}>{digits[i] ?? ''}</Text>
-                  </View>
-                ))}
-              </View>
-              {/* A real TextInput stacked exactly over the boxes — so a tap on a
-                  box is a genuine tap on the input itself. Calling .focus()
-                  programmatically (via onShow, below) is best-effort and can
-                  silently no-op on some Android OEM keyboards; a direct native
-                  touch on the input never fails to raise the keyboard. */}
-              <TextInput
-                ref={inputRef}
-                value={digits}
-                onChangeText={handleChange}
-                keyboardType="number-pad"
-                maxLength={CODE_LENGTH}
-                style={styles.overlayInput}
-                editable={!verifying && !locked}
-                caretHidden
-                contextMenuHidden
-              />
+            <View style={styles.digitsRow}>
+              {Array.from({ length: CODE_LENGTH }).map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.digitBox,
+                    i < digits.length && styles.digitBoxFilled,
+                    i === digits.length && !verifying && !locked && styles.digitBoxActive,
+                    error && !locked && styles.digitBoxError,
+                  ]}
+                >
+                  <Text style={styles.digitText}>{digits[i] ?? ''}</Text>
+                </View>
+              ))}
             </View>
           </Animated.View>
 
@@ -185,6 +170,47 @@ export default function CodeEntryModal({ payment, visible, onClose, onVerified }
               <Text style={styles.errorText}>{error}</Text>
             </View>
           )}
+
+          {/* Self-contained keypad instead of the system keyboard — a bottom
+              sheet has no reliable way to stay above a native keyboard on
+              Android without clipping its own content, and this keeps the
+              layout identical (and fully visible) on every device. */}
+          <View style={styles.keypad}>
+            {[['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9']].map((row, ri) => (
+              <View key={ri} style={styles.keypadRow}>
+                {row.map(d => (
+                  <TouchableOpacity
+                    key={d}
+                    style={styles.key}
+                    onPress={() => handleKeyTap(d)}
+                    activeOpacity={0.6}
+                    disabled={verifying || locked}
+                  >
+                    <Text style={styles.keyText}>{d}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ))}
+            <View style={styles.keypadRow}>
+              <View style={styles.key} />
+              <TouchableOpacity
+                style={styles.key}
+                onPress={() => handleKeyTap('0')}
+                activeOpacity={0.6}
+                disabled={verifying || locked}
+              >
+                <Text style={styles.keyText}>0</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.key}
+                onPress={handleBackspace}
+                activeOpacity={0.6}
+                disabled={verifying || locked || digits.length === 0}
+              >
+                <Ionicons name="backspace-outline" size={22} color={DS.text2} />
+              </TouchableOpacity>
+            </View>
+          </View>
 
           <TouchableOpacity style={styles.cancelBtn} onPress={onClose} activeOpacity={0.8} disabled={verifying}>
             <Text style={styles.cancelBtnText}>Cancel</Text>
@@ -212,8 +238,7 @@ const styles = StyleSheet.create({
   title:    { fontSize: 20, fontWeight: '800', color: DS.text, marginBottom: 6, textAlign: 'center' },
   subtitle: { fontSize: 13, color: DS.text2, textAlign: 'center', lineHeight: 19, marginBottom: 24, maxWidth: 280 },
 
-  digitsWrap: { alignSelf: 'center', marginBottom: 4 },
-  digitsRow: { flexDirection: 'row', gap: 8 },
+  digitsRow: { flexDirection: 'row', gap: 8, justifyContent: 'center', marginBottom: 4 },
   digitBox: {
     width: 44, height: 54, borderRadius: 12,
     borderWidth: 1.5, borderColor: DS.border, backgroundColor: DS.bg,
@@ -224,10 +249,14 @@ const styles = StyleSheet.create({
   digitBoxError:  { borderColor: DS.error, backgroundColor: DS.errorSoft },
   digitText: { fontSize: 22, fontWeight: '800', color: DS.text },
 
-  // Sits directly on top of digitsRow at its exact size — a real, tappable
-  // input rather than an off-to-the-side 1x1 decoy, so the OS always treats
-  // the tap as landing on a genuine text field.
-  overlayInput: { ...StyleSheet.absoluteFill, opacity: 0 },
+  keypad: { width: '100%', marginTop: 20, gap: 12 },
+  keypadRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  key: {
+    flex: 1, height: 54, borderRadius: 14,
+    backgroundColor: DS.bg, borderWidth: 1, borderColor: DS.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  keyText: { fontSize: 20, fontWeight: '700', color: DS.text },
 
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16 },
   statusText: { fontSize: 13, color: DS.text2, fontWeight: '600' },

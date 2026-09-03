@@ -30,7 +30,7 @@ export default function NotificationCard({
   onPress: () => void;
 }) {
   const { icon, bg, fg } = getNotificationDisplay(notification.type);
-  const unread = !notification.read;
+  const unread = !notification.isRead;
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
@@ -42,7 +42,7 @@ export default function NotificationCard({
         <Text style={[styles.title, unread && styles.titleUnread]} numberOfLines={1}>
           {notification.title}
         </Text>
-        <Text style={styles.desc} numberOfLines={2}>{notification.body}</Text>
+        <Text style={styles.desc} numberOfLines={2}>{notification.message}</Text>
         <Text style={styles.time}>{formatTimeAgo(notification.createdAt)}</Text>
       </View>
     </TouchableOpacity>

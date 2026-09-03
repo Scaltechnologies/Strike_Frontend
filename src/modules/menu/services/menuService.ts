@@ -1,11 +1,14 @@
 // src/modules/menu/services/menuService.ts
 // Menu ITEM operations only. Category reads live in categoryService.ts —
 // there is deliberately no category CRUD here; see menu.types.ts.
+//
+// Item photo upload is deliberately not exposed here either — vendors no
+// longer pick/upload an item image from this app (see ItemFormModal in
+// menu.tsx). The backend route itself may still exist; this file just has
+// no seam left that calls it.
 
-import axiosInstance, { BASE_URL } from '../../../core/api/axiosInstance';
+import axiosInstance from '../../../core/api/axiosInstance';
 import endpoints from '../../../core/api/endpoints';
-import { getAccessToken } from '../../../core/storage/secureStorage';
-import { uploadFile } from '../../../core/api/fileUpload';
 import type { ApiResponse } from '../../../core/types/api.types';
 import type { MenuItemResponse, CreateMenuItemRequest } from '../types/menu.types';
 
@@ -39,40 +42,4 @@ export async function updateMenuItem(
 
 export async function deleteMenuItem(itemId: number): Promise<void> {
   await axiosInstance.delete(endpoints.menu.item(itemId));
-}
-
-// POST /api/menu/items/{id}/image — confirmed live on vendor-service (see
-// endpoints.ts). Still handled leniently on failure: the item itself already
-// saved successfully via createMenuItem/updateMenuItem, so a failed photo
-// upload is "photo unavailable for now", not a reason to fail the whole save.
-export async function uploadMenuItemImage(
-  itemId: number,
-  localUri: string,
-): Promise<MenuItemResponse> {
-  const token = await getAccessToken();
-  const url = `${BASE_URL}${endpoints.menu.itemImage(itemId)}`;
-
-  const res = await uploadFile(url, localUri, 'file', token);
-
-  const body: ApiResponse<MenuItemResponse> | null = (() => {
-    try { return JSON.parse(res.body); } catch { return null; }
-  })();
-
-  if (res.status === 413) {
-    throw new Error('That photo is too large for the server to accept — please pick a different one.');
-  }
-  if (res.status < 200 || res.status >= 300) {
-    const message = body?.message || `HTTP ${res.status}`;
-    const apiError = new Error(`[${res.status}] ${endpoints.menu.itemImage(itemId)} — ${message}`) as Error & { status?: number };
-    apiError.status = res.status;
-    throw apiError;
-  }
-  if (!body) {
-    throw new Error('Malformed response from server.');
-  }
-
-  const data = body.data;
-  return data.imageUrl
-    ? { ...data, imageUrl: `${data.imageUrl}${data.imageUrl.includes('?') ? '&' : '?'}v=${Date.now()}` }
-    : data;
 }

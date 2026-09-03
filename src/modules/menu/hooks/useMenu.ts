@@ -5,7 +5,6 @@ import {
   createMenuItem,
   updateMenuItem,
   deleteMenuItem,
-  uploadMenuItemImage,
 } from '../services/menuService';
 import { getUserMessage } from '../../../core/api/errorMessage';
 import type {
@@ -32,7 +31,6 @@ export interface UseMenuReturn {
   addItem: (payload: CreateMenuItemRequest) => Promise<MenuItemResponse>;
   editItem: (itemId: number, payload: Partial<CreateMenuItemRequest>) => Promise<MenuItemResponse>;
   removeItem: (itemId: number) => Promise<void>;
-  setItemImage: (itemId: number, imageUri: string) => Promise<MenuItemResponse>;
 }
 
 export function useMenu(): UseMenuReturn {
@@ -100,12 +98,6 @@ export function useMenu(): UseMenuReturn {
     setItems(prev => prev.filter(i => i.id !== itemId));
   }, []);
 
-  const setItemImage = useCallback(async (itemId: number, imageUri: string) => {
-    const updated = await uploadMenuItemImage(itemId, imageUri);
-    setItems(prev => prev.map(i => (i.id === itemId ? updated : i)));
-    return updated;
-  }, []);
-
   return {
     categories,
     items,
@@ -117,6 +109,5 @@ export function useMenu(): UseMenuReturn {
     addItem,
     editItem,
     removeItem,
-    setItemImage,
   };
 }

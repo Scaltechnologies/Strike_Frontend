@@ -1,72 +1,46 @@
 // src/modules/notifications/services/notificationService.ts
-// VendorNotificationController — NOT YET IMPLEMENTED backend-side (see notification.types.ts).
-// Falls back to local mock data while USE_MOCK_NOTIFICATIONS is on, so the UI is
-// buildable/demoable ahead of the backend contract landing.
+// Talks to notification-service's real, already-implemented self-service API
+// (NotificationSelfServiceController → /api/notifications/me/**). Every response here
+// is the controller's raw Map/List — NOT wrapped in the app's usual ApiResponse<T> envelope.
 
 import axiosInstance from '../../../core/api/axiosInstance';
 import endpoints from '../../../core/api/endpoints';
-import { ApiResponse, PageResponse } from '../../../core/types/api.types';
-import { NotificationResponse, RegisterPushTokenRequest } from '../types/notification.types';
-import { MOCK_NOTIFICATIONS, USE_MOCK_NOTIFICATIONS } from '../mocks/mockNotifications';
+import { PageResponse } from '../../../core/types/api.types';
+import { NotificationResponse, RegisterPushTokenRequest, PushDeviceResponse } from '../types/notification.types';
 
-const MOCK_DELAY_MS = 350;
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-// GET /api/vendor/notifications
-export async function getNotifications(
-  page = 0,
-  size = 20,
-  unreadOnly = false,
-): Promise<PageResponse<NotificationResponse>> {
-  if (USE_MOCK_NOTIFICATIONS) {
-    await delay(MOCK_DELAY_MS);
-    const content = unreadOnly ? MOCK_NOTIFICATIONS.filter(n => !n.read) : MOCK_NOTIFICATIONS;
-    return { content, page: 0, size: content.length, totalElements: content.length, totalPages: 1, last: true };
-  }
-  const res = await axiosInstance.get<ApiResponse<PageResponse<NotificationResponse>>>(
+// GET /api/notifications/me
+export async function getNotifications(page = 0, size = 20): Promise<PageResponse<NotificationResponse>> {
+  const res = await axiosInstance.get<PageResponse<NotificationResponse>>(
     endpoints.notification.list,
-    { params: { page, size, unreadOnly } },
+    { params: { page, size } },
   );
-  return res.data.data;
+  return res.data;
 }
 
-// GET /api/vendor/notifications/unread-count
+// GET /api/notifications/me/unread-count -> { unreadCount }
 export async function getUnreadCount(): Promise<number> {
-  if (USE_MOCK_NOTIFICATIONS) {
-    await delay(MOCK_DELAY_MS);
-    return MOCK_NOTIFICATIONS.filter(n => !n.read).length;
-  }
-  const res = await axiosInstance.get<ApiResponse<{ count: number }>>(endpoints.notification.unreadCount);
-  return res.data.data.count;
+  const res = await axiosInstance.get<{ unreadCount: number }>(endpoints.notification.unreadCount);
+  return res.data.unreadCount;
 }
 
-// PATCH /api/vendor/notifications/{id}/read
+// PATCH /api/notifications/me/{id}/read
 export async function markNotificationRead(id: number): Promise<void> {
-  if (USE_MOCK_NOTIFICATIONS) {
-    const n = MOCK_NOTIFICATIONS.find(x => x.id === id);
-    if (n) n.read = true;
-    return;
-  }
   await axiosInstance.patch(endpoints.notification.markRead(id));
 }
 
-// PATCH /api/vendor/notifications/read-all
+// PATCH /api/notifications/me/read-all -> { updated }
 export async function markAllNotificationsRead(): Promise<void> {
-  if (USE_MOCK_NOTIFICATIONS) {
-    MOCK_NOTIFICATIONS.forEach(n => { n.read = true; });
-    return;
-  }
   await axiosInstance.patch(endpoints.notification.markAllRead);
 }
 
-// POST /api/vendor/notifications/push-token
-export async function registerPushToken(payload: RegisterPushTokenRequest): Promise<void> {
-  if (USE_MOCK_NOTIFICATIONS) return;
-  await axiosInstance.post(endpoints.notification.registerPushToken, payload);
+// POST /api/notifications/me/devices -> PushDevice { id, platform, deviceToken, active }
+export async function registerPushToken(payload: RegisterPushTokenRequest): Promise<PushDeviceResponse> {
+  const res = await axiosInstance.post<PushDeviceResponse>(endpoints.notification.registerPushToken, payload);
+  return res.data;
 }
 
-// DELETE /api/vendor/notifications/push-token
-export async function deregisterPushToken(expoPushToken: string): Promise<void> {
-  if (USE_MOCK_NOTIFICATIONS) return;
-  await axiosInstance.delete(endpoints.notification.deregisterPushToken, { data: { expoPushToken } });
+// DELETE /api/notifications/me/devices/{id} — deregisters by the numeric device id
+// returned at registration time, not by the raw token.
+export async function deregisterPushToken(deviceId: number): Promise<void> {
+  await axiosInstance.delete(endpoints.notification.deregisterPushToken(deviceId));
 }

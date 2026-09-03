@@ -1,6 +1,7 @@
 // src/modules/auth/services/authService.ts
 
 import axiosInstance from '../../../core/api/axiosInstance';
+import endpoints from '../../../core/api/endpoints';
 import { RegisterVendorRequest, VendorAuthResponse } from '../types/auth.types';
 
 // POST /api/auth/vendor/login — requests OTP for an existing vendor
@@ -26,4 +27,16 @@ export const registerVendor = async (
   payload: RegisterVendorRequest,
 ): Promise<void> => {
   await axiosInstance.post('/api/auth/vendor/register', payload);
+};
+
+// POST /api/auth/vendor/firebase-verify — exchanges a Firebase Phone Auth ID
+// token for the backend Vendor JWT. The idToken is never treated as the
+// application's session token; it is only ever sent here, once, in the
+// request body. Returns VendorAuthResponse — same shape as verifyOtp().
+export const firebaseVerify = async (idToken: string): Promise<VendorAuthResponse> => {
+  const res = await axiosInstance.post<VendorAuthResponse>(
+    endpoints.auth.vendor.firebaseVerify,
+    { idToken },
+  );
+  return res.data;
 };
