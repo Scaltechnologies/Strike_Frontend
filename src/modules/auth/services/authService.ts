@@ -1,8 +1,9 @@
 // src/modules/auth/services/authService.ts
 
-import axiosInstance from '../../../core/api/axiosInstance';
+import axiosInstance, { BASE_URL } from '../../../core/api/axiosInstance';
 import endpoints from '../../../core/api/endpoints';
 import { RegisterVendorRequest, VendorAuthResponse } from '../types/auth.types';
+import { uploadFile } from '../../../core/api/fileUpload';
 
 // POST /api/auth/vendor/login — requests OTP for an existing vendor
 export const sendOtp = async (mobileNumber: string): Promise<void> => {
@@ -27,6 +28,25 @@ export const registerVendor = async (
   payload: RegisterVendorRequest,
 ): Promise<void> => {
   await axiosInstance.post('/api/auth/vendor/register', payload);
+};
+
+// POST /api/auth/vendor/register/upload-logo — unauthenticated (called before /register,
+// since no vendor JWT exists yet). Returns { logoUrl } directly, no ApiResponse<T> envelope
+// (matches this controller's other endpoints — see verifyOtp's comment above). Uses the same
+// native multipart upload as uploadStoreBanner (storeService.ts) since RN's fetch/FormData/Blob
+// path doesn't work in this environment — see fileUpload.ts.
+export const registerLogoUpload = async (localUri: string): Promise<string> => {
+  const url = `${BASE_URL}${endpoints.auth.vendor.registerLogoUpload}`;
+  const res = await uploadFile(url, localUri, 'file', null);
+
+  const body: { logoUrl?: string } | null = (() => {
+    try { return JSON.parse(res.body); } catch { return null; }
+  })();
+
+  if (res.status < 200 || res.status >= 300 || !body?.logoUrl) {
+    throw new Error(`Logo upload failed (${res.status})`);
+  }
+  return body.logoUrl;
 };
 
 // POST /api/auth/vendor/firebase-verify — exchanges a Firebase Phone Auth ID

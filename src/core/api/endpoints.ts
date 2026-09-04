@@ -12,6 +12,10 @@ const endpoints = {
       // Firebase Phone Auth ID token exchange — the primary UI login path.
       // register/login/verify above remain the legacy fallback path.
       firebaseVerify: '/api/auth/vendor/firebase-verify',
+      // Multipart, unauthenticated (called before /register) — uploads a store
+      // banner picked on the signup screen and returns a URL to include as
+      // RegisterVendorRequest.logoUrl. See registerLogoUpload() in authService.ts.
+      registerLogoUpload: '/api/auth/vendor/register/upload-logo',
     },
     refresh: '/api/auth/refresh',
     logout:  '/api/auth/logout',

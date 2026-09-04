@@ -8,6 +8,7 @@ const KEYS = {
   ACCESS_TOKEN: 'access_token',
   REFRESH_TOKEN: 'refresh_token',
   USER: 'auth_user',
+  PENDING_BANNER: 'pending_store_banner',
 } as const;
 
 // expo-secure-store has no web implementation — calling it there throws
@@ -57,6 +58,41 @@ export const getUser = async <T>(): Promise<T | null> => {
 
 export const clearUser = async (): Promise<void> => {
   await deleteItem(KEYS.USER);
+};
+
+// ── Pending Store Banner ────────────────────────────
+//
+// A banner picked at signup can't be uploaded there and then: the vendor has
+// no JWT and no Store row in vendor-service until an admin approves them
+// (VendorAuthService.approveVendor -> syncVendorProfile), which happens in a
+// later, unrelated app session — possibly days later. So the picked local
+// file URI is persisted here at registration time, keyed to the mobile
+// number, and consumed (uploaded, then cleared) the next time this vendor
+// successfully authenticates with status ACTIVE, whichever session that is.
+// Deliberately NOT cleared by clearAll()/logout — the vendor may log out and
+// back in before being approved, and the pending banner should survive that.
+
+interface PendingBanner {
+  mobileNumber: string;
+  uri: string;
+}
+
+export const savePendingBanner = async (mobileNumber: string, uri: string): Promise<void> => {
+  await setItem(KEYS.PENDING_BANNER, JSON.stringify({ mobileNumber, uri }));
+};
+
+export const getPendingBanner = async (): Promise<PendingBanner | null> => {
+  const raw = await getItem(KEYS.PENDING_BANNER);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as PendingBanner;
+  } catch {
+    return null;
+  }
+};
+
+export const clearPendingBanner = async (): Promise<void> => {
+  await deleteItem(KEYS.PENDING_BANNER);
 };
 
 // ── Clear All (Logout) ────────────────────────────

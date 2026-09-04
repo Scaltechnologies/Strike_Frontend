@@ -44,4 +44,10 @@ export interface RegisterVendorRequest {
   email?: string;
   latitude: number;
   longitude: number;
+  // Returned by POST /api/auth/vendor/register/upload-logo (see
+  // authService.registerLogoUpload) when a banner was picked on the signup
+  // screen and the immediate upload succeeded. Left undefined otherwise —
+  // useRegister() then falls back to the existing deferred pending-banner
+  // upload on the vendor's first ACTIVE login instead.
+  logoUrl?: string;
 }
