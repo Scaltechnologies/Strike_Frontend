@@ -1,10 +1,11 @@
 import { useState, useCallback } from 'react';
 import {
   View, TouchableOpacity, StyleSheet,
-  StatusBar, ScrollView, Alert, RefreshControl,
+  StatusBar, ScrollView, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Text from '../../../components/Text';
+import LogoutConfirmModal from '../../../components/LogoutConfirmModal';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { clearAll } from '../../../core/storage/secureStorage';
@@ -130,6 +131,7 @@ export default function ProfileScreen() {
   const [storeStatus, setStoreStatus] = useState<StoreStatus | null>(null);
   const [loading, setLoading]         = useState(true);
   const [refreshing, setRefreshing]   = useState(false);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
@@ -154,20 +156,14 @@ export default function ProfileScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: async () => {
-          try { await deregisterCurrentPushToken(); } catch { /* best-effort, never blocks logout */ }
-          resetNotificationStore();
-          await clearAll();
-          router.replace('/(auth)/welcome');
-        },
-      },
-    ]);
+  const handleLogout = () => setLogoutModalVisible(true);
+
+  const confirmLogout = async () => {
+    setLogoutModalVisible(false);
+    try { await deregisterCurrentPushToken(); } catch { /* best-effort, never blocks logout */ }
+    resetNotificationStore();
+    await clearAll();
+    router.replace('/(auth)/welcome');
   };
 
   const shopName = profile?.shopName ?? '';
@@ -332,6 +328,12 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <LogoutConfirmModal
+        visible={logoutModalVisible}
+        onCancel={() => setLogoutModalVisible(false)}
+        onConfirm={confirmLogout}
+      />
     </View>
   );
 }

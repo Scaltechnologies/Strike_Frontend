@@ -1,12 +1,12 @@
 import {
   View, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, StatusBar,
-  ScrollView, ActivityIndicator,
+  ScrollView, ActivityIndicator, Keyboard,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import Text from '../../components/Text';
-import TextInput from '../../components/TextInput';
-import { useState } from 'react';
+import TextInput, { type TextInputRef } from '../../components/TextInput';
+import { useState, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -47,6 +47,29 @@ export default function SignupScreen() {
   const [locLoading, setLocLoading]     = useState(false);
   const [locError, setLocError]         = useState<string | null>(null);
   const [bannerUri, setBannerUri]       = useState<string | null>(null);
+
+  const scrollRef    = useRef<ScrollView>(null);
+  const hotelNameRef = useRef<TextInputRef>(null);
+  const addressRef   = useRef<TextInputRef>(null);
+  const emailRef     = useRef<TextInputRef>(null);
+  const mobileRef    = useRef<TextInputRef>(null);
+  const latitudeRef  = useRef<TextInputRef>(null);
+  const longitudeRef = useRef<TextInputRef>(null);
+
+  const scrollToInput = (ref: { current: TextInputRef | null }) => {
+    requestAnimationFrame(() => {
+      const scrollNode = scrollRef.current as unknown as {
+        getInnerViewRef: () => TextInputRef | null;
+      } | null;
+      const innerView = scrollNode?.getInnerViewRef();
+      if (!innerView) return;
+      ref.current?.measureLayout(
+        innerView,
+        (_x, y) => scrollRef.current?.scrollTo({ y: Math.max(y - 24, 0), animated: true }),
+        () => {},
+      );
+    });
+  };
 
   const coordsSet    = latitude.trim().length > 0 && longitude.trim().length > 0;
   const isFormValid  = !!(hotelName.trim() && address.trim() && email.trim() && mobileNumber.trim() && coordsSet);
@@ -103,6 +126,7 @@ export default function SignupScreen() {
 
       {/* Form Zone */}
       <ScrollView
+        ref={scrollRef}
         style={styles.formZone}
         contentContainerStyle={styles.formContent}
         keyboardShouldPersistTaps="handled"
@@ -125,16 +149,22 @@ export default function SignupScreen() {
 
         <Text style={styles.inputLabel}>Business Name *</Text>
         <TextInput
+          ref={hotelNameRef}
           style={styles.input}
           placeholder="e.g. Spice Garden"
           placeholderTextColor={DS.text3}
           value={hotelName}
           onChangeText={setHotelName}
           autoCapitalize="words"
+          onFocus={() => scrollToInput(hotelNameRef)}
+          returnKeyType="next"
+          submitBehavior="submit"
+          onSubmitEditing={() => addressRef.current?.focus()}
         />
 
         <Text style={styles.inputLabel}>Address *</Text>
         <TextInput
+          ref={addressRef}
           style={[styles.input, styles.inputMultiline]}
           placeholder="e.g. 123 Main Street, Hyderabad"
           placeholderTextColor={DS.text3}
@@ -143,6 +173,7 @@ export default function SignupScreen() {
           multiline
           numberOfLines={3}
           textAlignVertical="top"
+          onFocus={() => scrollToInput(addressRef)}
         />
 
         {/* ── CONTACT ── */}
@@ -150,6 +181,7 @@ export default function SignupScreen() {
 
         <Text style={styles.inputLabel}>Email</Text>
         <TextInput
+          ref={emailRef}
           style={styles.input}
           placeholder="store@example.com"
           placeholderTextColor={DS.text3}
@@ -157,6 +189,10 @@ export default function SignupScreen() {
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
+          onFocus={() => scrollToInput(emailRef)}
+          returnKeyType="next"
+          submitBehavior="submit"
+          onSubmitEditing={() => mobileRef.current?.focus()}
         />
 
         <Text style={styles.inputLabel}>Mobile Number *</Text>
@@ -166,6 +202,7 @@ export default function SignupScreen() {
           </View>
           <View style={styles.phoneDivider} />
           <TextInput
+            ref={mobileRef}
             style={styles.phoneInput}
             placeholder="98765 43210"
             placeholderTextColor={DS.text3}
@@ -174,6 +211,9 @@ export default function SignupScreen() {
             keyboardType="phone-pad"
             maxLength={10}
             editable={!paramPhone}
+            onFocus={() => scrollToInput(mobileRef)}
+            returnKeyType="done"
+            onSubmitEditing={() => Keyboard.dismiss()}
           />
         </View>
 
@@ -215,23 +255,32 @@ export default function SignupScreen() {
           <View style={styles.coordField}>
             <Text style={styles.inputLabel}>Latitude</Text>
             <TextInput
+              ref={latitudeRef}
               style={styles.input}
               placeholder="17.3850"
               placeholderTextColor={DS.text3}
               value={latitude}
               onChangeText={setLatitude}
               keyboardType="decimal-pad"
+              onFocus={() => scrollToInput(latitudeRef)}
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => longitudeRef.current?.focus()}
             />
           </View>
           <View style={styles.coordField}>
             <Text style={styles.inputLabel}>Longitude</Text>
             <TextInput
+              ref={longitudeRef}
               style={styles.input}
               placeholder="78.4867"
               placeholderTextColor={DS.text3}
               value={longitude}
               onChangeText={setLongitude}
               keyboardType="decimal-pad"
+              onFocus={() => scrollToInput(longitudeRef)}
+              returnKeyType="done"
+              onSubmitEditing={() => Keyboard.dismiss()}
             />
           </View>
         </View>
