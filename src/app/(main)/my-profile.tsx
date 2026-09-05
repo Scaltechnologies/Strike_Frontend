@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, TouchableOpacity, StyleSheet,
   StatusBar, ScrollView, Alert, ActivityIndicator,
@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Text from '../../components/Text';
-import TextInput from '../../components/TextInput';
+import TextInput, { type TextInputRef } from '../../components/TextInput';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -72,6 +72,25 @@ export default function MyProfileScreen() {
   const [loading, setLoading]   = useState(true);
   const [saving, setSaving]     = useState(false);
   const [form, setForm]         = useState<UpdateVendorProfileRequest>({});
+
+  const scrollRef = useRef<ScrollView>(null);
+  const fieldRefs  = useRef<Record<string, TextInputRef | null>>({});
+
+  const scrollToInput = (key: string) => {
+    requestAnimationFrame(() => {
+      const scrollNode = scrollRef.current as unknown as {
+        getInnerViewRef: () => TextInputRef | null;
+      } | null;
+      const innerView = scrollNode?.getInnerViewRef();
+      const target = fieldRefs.current[key];
+      if (!innerView || !target) return;
+      target.measureLayout(
+        innerView,
+        (_x, y) => scrollRef.current?.scrollTo({ y: Math.max(y - 24, 0), animated: true }),
+        () => {},
+      );
+    });
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -148,6 +167,7 @@ export default function MyProfileScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -181,9 +201,11 @@ export default function MyProfileScreen() {
             <View key={field.key} style={idx < FIELDS.length - 1 ? styles.fieldWrap : styles.fieldWrapLast}>
               <Text style={styles.fieldLabel}>{field.label}</Text>
               <TextInput
+                ref={ref => { fieldRefs.current[field.key] = ref; }}
                 style={[styles.input, field.multiline && styles.inputMultiline]}
                 value={String(form[field.key] ?? '')}
                 onChangeText={val => setForm(prev => ({ ...prev, [field.key]: val }))}
+                onFocus={() => scrollToInput(field.key)}
                 placeholder={field.placeholder}
                 placeholderTextColor={DS.text3}
                 keyboardType={field.keyboardType ?? 'default'}
