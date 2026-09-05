@@ -13,6 +13,22 @@ import {
 } from '../../../core/storage/secureStorage';
 import { RegisterVendorRequest } from '../types/auth.types';
 import { uploadStoreBanner } from '../../store/services/storeService';
+import { getUserMessage } from '../../../core/api/errorMessage';
+
+const SUSPENDED_VENDOR_MESSAGE =
+  'You have been suspended. Please contact the admin for more details.';
+
+// The backend surfaces a suspended vendor as a thrown API error (any status,
+// message mentioning "suspend") rather than as a structured field — this is
+// the one spot that needs to translate that into copy a vendor can act on,
+// instead of the raw "[400] /api/... — Vendor is suspended" axiosInstance text.
+function resolveAuthErrorMessage(err: any, fallback: string): string {
+  const raw = err instanceof Error ? err.message : String(err ?? '');
+  if (err?.code === 'VENDOR_SUSPENDED' || /suspend/i.test(raw)) {
+    return SUSPENDED_VENDOR_MESSAGE;
+  }
+  return getUserMessage(err, fallback);
+}
 
 // ── Send OTP Hook (Login flow) ────────────────────────────────────────
 // Firebase Phone Auth — sends a real SMS via signInWithPhoneNumber() and
@@ -33,7 +49,7 @@ export const useSendOtp = () => {
         params: { phoneNumber: mobileNumber },
       });
     } catch (err: any) {
-      setError(err.message || 'Failed to send OTP');
+      setError(resolveAuthErrorMessage(err, 'Failed to send OTP'));
     } finally {
       setLoading(false);
     }
@@ -55,7 +71,7 @@ export const useResendOtp = () => {
       setError(null);
       await sendPhoneOtp(mobileNumber);
     } catch (err: any) {
-      setError(err.message || 'Failed to resend OTP');
+      setError(resolveAuthErrorMessage(err, 'Failed to resend OTP'));
       throw err;
     } finally {
       setLoading(false);
@@ -130,14 +146,19 @@ export const useVerifyOtp = () => {
         }
 
         router.replace('/(main)/home');
+      } else if (response.status === 'SUSPENDED') {
+        // Stay on this screen with a clear, actionable message instead of the
+        // generic "Pending Approval" copy, which doesn't apply once a vendor
+        // has actually been suspended.
+        setError(SUSPENDED_VENDOR_MESSAGE);
       } else {
-        // PENDING, VERIFIED, SUSPENDED, REJECTED — not yet approved. The
-        // pending banner (if any) stays in secureStorage, to be uploaded the
-        // next time this vendor logs in and lands here with status ACTIVE.
+        // PENDING, VERIFIED, REJECTED — not yet approved. The pending banner
+        // (if any) stays in secureStorage, to be uploaded the next time this
+        // vendor logs in and lands here with status ACTIVE.
         router.replace('/(auth)/pending-approval');
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to verify OTP');
+      setError(resolveAuthErrorMessage(err, 'Failed to verify OTP'));
     } finally {
       setLoading(false);
     }
@@ -207,7 +228,7 @@ export const useRegister = () => {
         params: { phoneNumber: payload.mobileNumber, bannerUri: !logoUrl ? (bannerUri ?? '') : '' },
       });
     } catch (err: any) {
-      setError(err.message || 'Registration failed');
+      setError(resolveAuthErrorMessage(err, 'Registration failed'));
     } finally {
       setLoading(false);
     }

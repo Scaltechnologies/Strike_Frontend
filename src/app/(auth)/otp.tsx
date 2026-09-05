@@ -57,12 +57,35 @@ export default function OtpScreen() {
     }
   };
 
+  // Each box's native maxLength is OTP_LENGTH (not 1) so a full paste isn't
+  // truncated to a single character before it ever reaches this handler —
+  // `digits` is what actually landed in the box (1 char for manual typing
+  // thanks to selectTextOnFocus replacing the prior digit, OTP_LENGTH chars
+  // for a paste/autofill), and drives which branch below applies.
   const handleChange = (text: string, index: number) => {
-    if (!/^\d*$/.test(text)) return;
+    const digits = text.replace(/\D/g, '');
+
+    if (digits.length > 1) {
+      // Paste or OS autofill — always distribute from the first box so the
+      // whole code lands correctly no matter which box had focus.
+      const chars = digits.slice(0, OTP_LENGTH).split('');
+      const newOtp = Array(OTP_LENGTH).fill('');
+      chars.forEach((d, i) => { newOtp[i] = d; });
+      setOtp(newOtp);
+      inputs.current[Math.min(chars.length, OTP_LENGTH - 1)]?.focus();
+      return;
+    }
+
+    if (digits.length === 0 && text.length > 0) {
+      // Clipboard/keystroke had no digits in it at all — ignore, don't wipe
+      // whatever this box already held.
+      return;
+    }
+
     const newOtp = [...otp];
-    newOtp[index] = text;
+    newOtp[index] = digits;
     setOtp(newOtp);
-    if (text && index < OTP_LENGTH - 1) inputs.current[index + 1]?.focus();
+    if (digits && index < OTP_LENGTH - 1) inputs.current[index + 1]?.focus();
   };
 
   const handleKeyPress = (e: any, index: number) => {
@@ -111,8 +134,12 @@ export default function OtpScreen() {
               key={index}
               ref={ref => { inputs.current[index] = ref; }}
               style={[styles.otpBox, otp[index] ? styles.otpBoxFilled : null]}
-              maxLength={1}
+              maxLength={OTP_LENGTH}
               keyboardType="number-pad"
+              textContentType="oneTimeCode"
+              autoComplete={index === 0 ? 'one-time-code' : 'off'}
+              importantForAutofill={index === 0 ? 'yes' : 'no'}
+              selectTextOnFocus
               value={otp[index]}
               onChangeText={text => handleChange(text, index)}
               onKeyPress={e => handleKeyPress(e, index)}

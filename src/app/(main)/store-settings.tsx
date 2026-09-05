@@ -1,11 +1,12 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   View, TouchableOpacity, ScrollView, Modal,
   StyleSheet, StatusBar, Alert, ActivityIndicator,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Text from '../../components/Text';
-import TextInput from '../../components/TextInput';
+import TextInput, { type TextInputRef } from '../../components/TextInput';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useRedemption } from '../../modules/redemption/store/RedemptionContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -420,6 +421,25 @@ export default function StoreSettingsScreen() {
   const [categoryOptions, setCategoryOptions] = useState<StoreCategoryOption[]>([]);
   const [categorySheetOpen, setCategorySheetOpen] = useState(false);
 
+  const scrollRef = useRef<ScrollView>(null);
+  const fieldRefs  = useRef<Record<string, TextInputRef | null>>({});
+
+  const scrollToInput = (key: string) => {
+    requestAnimationFrame(() => {
+      const scrollNode = scrollRef.current as unknown as {
+        getInnerViewRef: () => TextInputRef | null;
+      } | null;
+      const innerView = scrollNode?.getInnerViewRef();
+      const target = fieldRefs.current[key];
+      if (!innerView || !target) return;
+      target.measureLayout(
+        innerView,
+        (_x, y) => scrollRef.current?.scrollTo({ y: Math.max(y - 24, 0), animated: true }),
+        () => {},
+      );
+    });
+  };
+
   // ── Status
   const [savingStatus, setSavingStatus] = useState(false);
 
@@ -695,7 +715,10 @@ export default function StoreSettingsScreen() {
       </View>
 
       {/* ── White sheet ── */}
-      <View style={styles.sheet}>
+      <KeyboardAvoidingView
+        style={styles.sheet}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         {loading ? (
           <View style={styles.centreWrap}>
             <ActivityIndicator color={DS.primary} size="large" />
@@ -712,6 +735,7 @@ export default function StoreSettingsScreen() {
           </View>
         ) : store ? (
           <ScrollView
+            ref={scrollRef}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
             keyboardShouldPersistTaps="handled"
@@ -792,8 +816,10 @@ export default function StoreSettingsScreen() {
                       <View key={f.label} style={styles.formGroup}>
                         <Text style={styles.formLabel}>{f.label}</Text>
                         <TextInput
+                          ref={ref => { fieldRefs.current[f.label] = ref; }}
                           value={f.value as string}
                           onChangeText={f.set as (v: string) => void}
+                          onFocus={() => scrollToInput(f.label)}
                           placeholder={f.placeholder}
                           placeholderTextColor={DS.text3}
                           keyboardType={(f as any).kb}
@@ -818,8 +844,10 @@ export default function StoreSettingsScreen() {
                     <View style={styles.formGroup}>
                       <Text style={styles.formLabel}>About</Text>
                       <TextInput
+                        ref={ref => { fieldRefs.current['About'] = ref; }}
                         value={editDescription}
                         onChangeText={setEditDescription}
+                        onFocus={() => scrollToInput('About')}
                         placeholder="Brief description of your store…"
                         placeholderTextColor={DS.text3}
                         style={[styles.formInput, { minHeight: 80, textAlignVertical: 'top', paddingTop: 12 }]}
@@ -978,7 +1006,7 @@ export default function StoreSettingsScreen() {
 
           </ScrollView>
         ) : null}
-      </View>
+      </KeyboardAvoidingView>
 
       {/* ── Timing modal ── */}
       {timingModal && (
