@@ -13,7 +13,11 @@ export type NotificationType =
   | 'SUBSCRIPTION_PURCHASED'
   | 'SUBSCRIPTION_EXPIRED'
   | 'SUBSCRIPTION_CANCELLED'
-  | 'WALLET_LOW_BALANCE';
+  | 'WALLET_LOW_BALANCE'
+  | 'VENDOR_APPROVED'
+  | 'VENDOR_REJECTED'
+  | 'VENDOR_SUSPENDED'
+  | 'VENDOR_REACTIVATED';
 
 // CARD_REQUEST and REDEMPTION_REQUEST need an immediate, hard-to-miss alert
 // (siren + urgent sheet) — everything else gets the lighter in-app banner.
