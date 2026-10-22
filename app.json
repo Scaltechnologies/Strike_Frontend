@@ -4,6 +4,7 @@
     "slug": "scalatechnologies",
     "version": "1.0.0",
     "scheme": "strike-frontend",
+    "icon": "./assets/icon.png",
     "platforms": [
       "ios",
       "android",
@@ -12,16 +13,15 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FEF0E6"
+        "monochromeImage": "./assets/adaptive-icon-monochrome.png",
+        "backgroundColor": "#FFFFFF"
       },
       "package": "com.strike.frontend",
       "googleServicesFile": "./google-services.json",
-      "usesCleartextTraffic": true,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA"
       ]
     },
@@ -42,12 +42,14 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Strike needs access to your photos so you can set a banner image for your store."
+          "photosPermission": "Strike needs access to your photos so you can set a banner image for your store.",
+          "microphonePermission": false
         }
       ],
       [
         "expo-notifications",
         {
+          "icon": "./assets/notification-icon.png",
           "color": "#CC2200",
           "sounds": ["./assets/sounds/notify.wav", "./assets/sounds/vendor_alert_siren.wav"]
         }
@@ -55,7 +57,8 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Strike needs your camera to scan a customer's Pay-at-Store QR code."
+          "cameraPermission": "Strike needs your camera to scan a customer's Pay-at-Store QR code.",
+          "recordAudioAndroid": false
         }
       ],
       "@react-native-firebase/app",

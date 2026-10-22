@@ -3,7 +3,7 @@ import {
   KeyboardAvoidingView, Platform, StatusBar,
   ScrollView, ActivityIndicator, Keyboard,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import Text from '../../components/Text';
 import TextInput, { type TextInputRef } from '../../components/TextInput';
 import { useState, useRef } from 'react';
@@ -310,9 +310,9 @@ export default function SignupScreen() {
 
         <Text style={styles.termsText}>
           By signing up you agree to our{' '}
-          <Text style={styles.termsLink}>Terms & Conditions</Text>
+          <Text style={styles.termsLink} onPress={() => router.push('/terms')}>Terms & Conditions</Text>
           {' and '}
-          <Text style={styles.termsLink}>Privacy Policy</Text>
+          <Text style={styles.termsLink} onPress={() => router.push('/privacy-policy')}>Privacy Policy</Text>
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>

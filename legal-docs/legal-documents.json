@@ -1,0 +1,3163 @@
+{
+  "terms": {
+    "title": "Terms & Conditions",
+    "lastUpdated": "22 October 2026",
+    "isDraft": false,
+    "sections": [
+      {
+        "heading": "Welcome to STRIKE",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "These Terms & Conditions (the “Terms”) govern access to and use of the STRIKE website, mobile application, digital membership services, subscription services and related technology platform (collectively, the “Platform”).",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE is operated by Strike Technologies Private Limited (“STRIKE”, “we”, “us” or “our”).",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "By accessing the Platform, creating an account, purchasing a membership or using a STRIKE service, you agree to these Terms and to the policies expressly incorporated into them. If you do not agree, do not use the Platform.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "1. About STRIKE",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE is a digital subscription and membership infrastructure platform that connects customers with participating local businesses (“Vendors”). Customers may discover, purchase and use digital membership cards, prepaid subscriptions, consumption-based benefits, offers and other services made available by participating Vendors.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "The Platform may support the following journey: discovery, purchase, digital membership, verification, redemption and usage tracking.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Unless expressly stated otherwise, STRIKE provides the technology platform and is not the manufacturer, owner or direct provider of the food, beverages, salon, gym, study-hall or other goods and services supplied by a Vendor. This description does not exclude any responsibility that applicable law places on STRIKE.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "2. Participating Vendors",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Participating businesses are independent businesses. Subject to applicable law and the specific membership terms, Vendors are responsible for:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "The goods and services they provide, including quality and quantity.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Availability, operating hours and service delivery.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Vendor-specific membership conditions and fulfilment of eligible benefits.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Applicable warranties and compliance with laws relevant to their business.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "The accuracy of information they provide to STRIKE.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Confirming redemptions where the Platform or membership rules require Vendor confirmation.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE provides technology infrastructure for memberships and transactions but does not control every aspect of a Vendor’s independent operations. STRIKE will handle matters for which it is responsible under these Terms and applicable law. Nothing in these Terms limits customer rights or remedies that cannot lawfully be excluded.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "3. Eligibility",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "You may use STRIKE only in accordance with applicable laws of India. Users aged 18 years or older may create an account and enter into transactions for which they are legally eligible.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "A person under 18 may access only those features that are permitted by applicable law and STRIKE’s actual age policy, with the consent and supervision of a parent or legal guardian where required. A minor must not independently enter into a purchase or membership contract where the law requires contractual capacity; any such transaction must be completed by an eligible adult or otherwise handled as permitted by law. If a parent or legal guardian does not provide consent where consent is required, the minor must discontinue the relevant use.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE may restrict or terminate access where it reasonably believes a user is ineligible or has misrepresented their age, subject to applicable law. You must provide accurate and complete information when using the Platform.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "4. STRIKE Account",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Some features require an account. You agree to:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Provide accurate and complete information and keep it updated.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Protect your login credentials and one-time passwords (OTPs).",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Not share your account with unauthorised persons.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Notify STRIKE through the published support channel if you suspect unauthorised access.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Take reasonable care with activity carried out through your account, subject to applicable law and STRIKE’s own security obligations.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "You must not use another person’s account without authorisation. You are responsible for keeping your login credentials, verification codes, passwords and other account-security information confidential and must not disclose them to unauthorised persons.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "You are responsible for activity carried out through your account to the extent permitted by applicable law, including activity resulting from your failure to take reasonable care of your credentials; this does not make you responsible for activity not reasonably attributable to you or remove STRIKE’s own legal obligations.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE may disable, restrict, suspend or terminate an account or credentials where reasonably necessary because of suspected unauthorised use, fraud, security risk or a material breach of these Terms, subject to applicable law and any notice or review process that is required or offered by STRIKE.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "5. Digital Memberships",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE may offer digital memberships, subscriptions, passes and prepaid benefits. Each membership may have specific terms, which will be displayed before purchase where applicable and form part of the agreement for that membership. Membership-specific terms may include:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Price and applicable charges.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Activation date and validity period.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Benefits, units and usage limits.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Participating Vendor(s), eligible locations and time restrictions.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Redemption and Vendor-confirmation requirements.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Renewal, cancellation and refund conditions.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Please review the membership-specific information before purchase. If a material restriction is not clearly disclosed before purchase, the matter will be handled in accordance with applicable law and the relevant approved policy.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "6. Prepaid Memberships and Consumption Units",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Some memberships may provide a specified number of meals, visits, services or other eligible consumption units during a defined validity period. The applicable membership information should state the unit type, number of units, activation and expiry rules, eligible Vendor, redemption conditions and restrictions.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Unused units do not constitute cash or a deposit balance and cannot be exchanged for cash unless the membership terms expressly provide otherwise or applicable law requires a different outcome.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "7. Membership Benefits",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Depending on the membership, benefits may include prepaid products or services, discounts, special offers, member-only pricing, loyalty benefits, priority or early access, Vendor-specific benefits or other benefits described on the Platform.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Benefits may vary by Vendor and plan. A Vendor or STRIKE may change or discontinue an offer only to the extent permitted by the disclosed membership terms and applicable law. Any change affecting an existing purchase will be handled under the applicable membership terms and law.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "8. Purchase and Payment",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Membership prices and applicable charges will be displayed before checkout is completed. The amount payable may include the membership price, applicable taxes, platform or service charges and other charges disclosed at checkout. You agree to pay the amount displayed at checkout.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Payments may be processed through third-party payment service providers. A purchase is treated as successful after STRIKE receives confirmation of successful payment and the membership is issued or otherwise made available as described at checkout.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "If an amount is debited but the membership is not successfully issued, STRIKE will investigate the transaction and, where appropriate, facilitate a reversal or refund in accordance with applicable law and the payment provider’s processes. Pending, failed, duplicate or disputed transactions may be reported through the support channel in Section 25.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "9. Pricing and Promotions",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "The price applicable to a membership is generally the price displayed when you complete the purchase. STRIKE or Vendors may change prices for future purchases.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Promotions, discounts and offers may be subject to eligibility rules, validity periods, maximum usage, minimum purchase requirements, Vendor or payment restrictions, geographic restrictions, blackout periods and limited availability. Unless expressly stated otherwise, promotions cannot be combined with other offers. STRIKE may correct pricing or promotional errors and modify or withdraw promotions where permitted by applicable law. Changes will not override mandatory customer rights.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "10. Redemption",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "A membership may be redeemed only in accordance with its applicable conditions. The Vendor may need to verify the membership before providing the relevant goods or services. STRIKE may record each redemption to maintain an accurate membership record. A successful redemption may reduce the available units or entitlement in accordance with the applicable membership rules.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Where Vendor confirmation is required by the applicable redemption flow, a redemption is completed only after the Vendor confirms the transaction through STRIKE or another authorised STRIKE mechanism. STRIKE may investigate disputed, duplicate, suspicious or unauthorised redemptions and may correct records where appropriate, subject to applicable law and the evidence available.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "11. Unauthorised Use and Fraud",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "You must not:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Share screenshots, QR codes or credentials to enable unauthorised use.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Duplicate or manipulate memberships, QR codes or digital credentials.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Circumvent redemption controls or use another person’s membership without authorisation.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Make fraudulent redemption claims or manipulate promotional benefits.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Create fraudulent accounts or obtain benefits through technical or operational abuse.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE may restrict, suspend or terminate a membership or account involved in suspected fraud or abuse, subject to applicable law and any review process that applies.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "12. Cancellation and Refunds",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Cancellation and refund eligibility depends on the membership-specific terms, any applicable Vendor terms, activation status, benefits or units already used, the reason for the request, the refund policy shown at purchase and applicable law.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "A membership clearly identified as non-refundable may be non-refundable except where STRIKE expressly permits a refund or applicable law requires one. No term in this section removes any non-waivable statutory right. Where a refund is approved, it will generally be processed through the original payment method or another lawful method. Actual processing time may depend on the payment provider.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "13. Vendor Closure or Service Failure",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "If a Vendor permanently closes, materially stops providing a subscribed service or is unable to honour a purchased membership, STRIKE may, where reasonably possible and consistent with the membership terms and applicable law:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Assist with resolution and communicate with the Vendor.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Offer an alternative solution or transfer to another participating Vendor, where available and appropriate.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Facilitate an applicable refund or another reasonable remedy.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "The available remedy will depend on the circumstances, the membership terms and applicable law. This section does not guarantee that a replacement Vendor or particular remedy will always be available.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "14. Service Availability",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Vendor services may be temporarily unavailable due to business hours, holidays, capacity limits, temporary closure, maintenance, public events, operational circumstances, force majeure events or other circumstances outside reasonable control. Purchasing a membership does not guarantee immediate availability at every moment unless the membership expressly provides such a guarantee. Any remedy for material unavailability remains subject to the applicable terms and law.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "15. Customer Responsibilities",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "You agree to use STRIKE lawfully, honestly and responsibly. You must not:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Use STRIKE for unlawful purposes or provide false information.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Commit fraud, abuse promotional offers or attempt unauthorised access.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Reverse engineer the Platform or interfere with its security.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Introduce malicious software or scrape or systematically copy Platform content without authorisation.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Misrepresent your identity or harass or abuse Vendors or STRIKE personnel.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Circumvent usage or redemption restrictions.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Resell memberships or benefits where prohibited by the applicable terms or law.",
+                  "bold": false
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "16. Intellectual Property",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "The STRIKE name, logo, trademarks, software, Platform design, interface, graphics, text, databases, technology and other intellectual property are owned by or licensed to Strike Technologies Private Limited. Except as expressly permitted by law or with prior written permission, you may not copy, modify, reproduce, distribute, sell, license, reverse engineer, create derivative works from or commercially exploit STRIKE intellectual property. Third-party trademarks remain the property of their respective owners.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "17. User Content, Reviews and Feedback",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Where STRIKE allows reviews, ratings, comments, photographs, feedback or other user content, you are responsible for what you submit and represent that you have the necessary rights to submit it. You must not submit fake reviews, misleading or defamatory information, unlawful content, impersonation, content intended to manipulate ratings or content that infringes another person’s rights.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Subject to applicable law, you grant STRIKE a non-exclusive, worldwide, royalty-free licence to use submitted content for operating, improving and promoting the Platform. STRIKE may remove content that violates these Terms or applicable law.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "18. Platform Availability",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE aims to provide reliable services but does not guarantee that the Platform will always be available, uninterrupted, error-free, completely secure, free from technical defects or compatible with every device. Temporary interruptions may occur due to maintenance, technical problems, network failures, third-party services or circumstances outside STRIKE’s reasonable control. Nothing in this section excludes a responsibility that cannot lawfully be excluded.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "19. Third-Party Services",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE may integrate with third-party services such as payment providers, authentication services, mapping services, cloud infrastructure, communication services, analytics services or other technology providers. Those services may be governed by their own terms and privacy policies. The STRIKE Privacy Policy describes the relevant providers and how data is shared with them.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "20. STRIKE’s Role and Vendor Responsibility",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE provides technology infrastructure connecting customers and participating Vendors. Vendors remain responsible for the underlying goods and services they provide, including quality, availability, staff conduct, business operations and fulfilment obligations. STRIKE remains responsible for its own obligations under these Terms and applicable law. Nothing in these Terms excludes or limits liability that cannot lawfully be excluded or limited.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "21. Limitation of Liability",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "To the maximum extent permitted by applicable law, STRIKE will not be liable for indirect, incidental, special or consequential losses arising from matters outside STRIKE’s reasonable control or from independent acts or omissions of Vendors. This limitation applies only to the extent legally permitted and does not apply to liability that cannot lawfully be excluded or limited. Nothing in this section is intended to remove or restrict statutory rights available to consumers.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "22. Fraud, Security and Misuse",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE may investigate activity that appears fraudulent, abusive, suspicious or inconsistent with legitimate use. Where appropriate and legally permitted, STRIKE may suspend an account, restrict a membership, disable redemption, cancel fraudulent transactions, require additional verification, seek recovery of amounts obtained through fraud or take appropriate legal action.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "23. Suspension and Termination",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE may suspend or terminate access to the Platform or particular services where reasonably necessary because of a violation of these Terms, fraud, abuse, security risks, illegal activity, membership misuse, repeated violations, payment-related issues or legal or regulatory requirements.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Termination does not automatically eliminate rights or obligations that arose before termination. Treatment of active memberships, unused units and any applicable refund or statutory remedy will be determined under the relevant membership terms and applicable law.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "24. Privacy",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Your use of STRIKE is also governed by the STRIKE Privacy Policy, which explains how STRIKE collects, uses, stores, shares and otherwise processes personal data. The Privacy Policy is available on the Platform, including in the STRIKE mobile application, and forms part of the overall framework governing use of the Platform to the extent permitted by law.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "25. Complaints and Grievance Redressal",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "For complaints about a membership, payment, redemption, Vendor service, refund, account, Platform functionality or another STRIKE-related matter, contact STRIKE using the support channel published on the Platform or the contact details in Section 30. STRIKE will endeavour to acknowledge and address complaints in the manner and within the timelines required by applicable law.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "26. Changes to These Terms",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE may update these Terms from time to time. The updated version will be published on the Platform with a revised “Last Updated” date. Where required by applicable law, STRIKE will provide additional notice of material changes. Continued use after the effective date of revised Terms constitutes acceptance only to the extent permitted by applicable law. Changes will not remove rights that have already accrued where law protects those rights.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "27. Governing Law and Jurisdiction",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "These Terms are governed by the laws of India. Subject to applicable consumer-protection laws and other mandatory legal requirements, disputes will be subject to the jurisdiction of courts having appropriate jurisdiction over the matter. Nothing in these Terms prevents a consumer from exercising a statutory right or remedy available under applicable law.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "28. Severability",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "If any provision of these Terms is found invalid, unlawful or unenforceable, it will be interpreted or modified to the minimum extent necessary to make it enforceable where legally possible. The remaining provisions will continue in effect.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "29. Entire Agreement",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "These Terms, together with the STRIKE Privacy Policy, applicable Cancellation and Refund Policy, membership-specific terms and any Vendor-specific terms disclosed at purchase, constitute the principal terms governing use of the Platform.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "If a specific membership term displayed at the time of purchase conflicts with these general Terms, the specific term will govern that membership to the extent of the conflict, subject to applicable law. No policy or term may override mandatory legal rights.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "30. Contact and Legal Information",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Legal entity:",
+                "bold": true
+              },
+              {
+                "kind": "text",
+                "text": " Strike Technologies Private Limited",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Registered office:",
+                "bold": true
+              },
+              {
+                "kind": "text",
+                "text": " Flat No. 305, Tirumala Enclave Apartment, Chirala, Prakasam, Bapatla District, Andhra Pradesh, India – 523155",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Email:",
+                "bold": true
+              },
+              {
+                "kind": "text",
+                "text": " ",
+                "bold": false
+              },
+              {
+                "kind": "link",
+                "text": "support.striketechnologies@gmail.com",
+                "href": "mailto:support.striketechnologies@gmail.com",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Phone:",
+                "bold": true
+              },
+              {
+                "kind": "text",
+                "text": " ",
+                "bold": false
+              },
+              {
+                "kind": "link",
+                "text": "8143604709",
+                "href": "tel:+918143604709",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Website:",
+                "bold": true
+              },
+              {
+                "kind": "text",
+                "text": " ",
+                "bold": false
+              },
+              {
+                "kind": "link",
+                "text": "www.strikeapp.in",
+                "href": "https://www.strikeapp.in",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "© 2026 Strike Technologies Private Limited. All rights reserved.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "company": {
+      "legalName": "Strike Technologies Private Limited",
+      "registeredOffice": "Flat No. 305, Tirumala Enclave Apartment, Chirala, Prakasam, Bapatla District, Andhra Pradesh, India – 523155",
+      "supportEmail": "support.striketechnologies@gmail.com",
+      "supportPhone": "8143604709",
+      "supportPhoneE164": "+918143604709",
+      "website": "www.strikeapp.in",
+      "websiteUrl": "https://www.strikeapp.in"
+    }
+  },
+  "privacy": {
+    "title": "Privacy Policy",
+    "effectiveDate": "22 October 2026",
+    "lastUpdated": "22 October 2026",
+    "isDraft": false,
+    "sections": [
+      {
+        "heading": "1. Introduction",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Strike Technologies Private Limited (“STRIKE”, “Company”, “we”, “us” or “our”) is committed to protecting the privacy and personal information of individuals who access or use our mobile applications, website and associated services (collectively, the “Platform”).",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "This Privacy Policy explains how we collect, receive, use, store, process, disclose, retain and protect personal information when you access or use STRIKE, create an account, explore participating businesses, purchase or redeem offers, subscribe to meal plans or memberships, make payments, or otherwise interact with our Platform.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE is designed to connect users with participating businesses and service providers through digital offers, food cards, meal plans and membership benefits across Food, Wellness and Beauty.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "This Policy is intended to be read together with our Terms & Conditions and any additional privacy notices displayed when you use particular features of the Platform.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Please read this Policy carefully before using STRIKE. Where applicable law requires consent for the collection or processing of personal information, we will seek such consent before undertaking the relevant processing.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "2. Scope and Applicability",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "This Policy applies to:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Users who register for or access the STRIKE application or website.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Individuals who purchase, subscribe to, redeem or use STRIKE offers, food cards, meal plans or memberships.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Individuals who communicate with our customer support team.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Visitors who interact with our Platform without creating an account.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Representatives of participating businesses and vendors who interact with STRIKE, including users of the STRIKE Vendor app.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Certain information may be processed by third-party payment providers, authentication providers, vendors or other service providers under their own privacy policies and applicable legal obligations.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "This Policy does not automatically govern third-party websites, applications or services that STRIKE does not operate or control.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "3. Information We Collect",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "We collect only the information reasonably necessary to provide, maintain, secure and improve our services, subject to applicable law and the permissions you provide.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "subheading": "3.1 Account and Registration Information"
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "When you create or access a STRIKE account, we may collect:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Full name.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Mobile phone number.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Email address.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Account identifiers and authentication-related information.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Information made available through Google sign-in, if you choose that authentication method.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Account preferences and other details you voluntarily provide.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "We use this information to establish and manage your account, verify access, communicate with you and provide the services you request.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "subheading": "3.2 Address and Location Information"
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE may collect or process address and location information to provide location-dependent features. Depending on the feature you use, this may include:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Your saved or provided address.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Your approximate or precise device location, where you grant the relevant permission.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Location information associated with vendor discovery or an eligible delivery or fulfilment service.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Selected service areas and location preferences.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Location information may be used to:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Display participating vendors and businesses near you.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Show relevant offers and available services in your area.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Support delivery or fulfilment where such a service is offered.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Determine the applicability of geographical restrictions on offers or memberships.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Help prevent suspicious transactions or misuse of location-dependent benefits.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "You may be able to disable device location access through your device settings. However, certain features may not function fully without the relevant permission.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE will not treat permission to access device location as unrestricted permission to track you for unrelated purposes.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "subheading": "3.3 Transaction and Purchase Information"
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "When you purchase or use a STRIKE product or service, we may collect information relating to:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Strike Monthly food cards and associated offers.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Strike Mealo weekly, bi-weekly or monthly meal plans.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Strike Memberships across Food, Wellness and Beauty.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Selected offers, participating vendors and membership plans.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Purchase amounts, transaction references and payment status.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Subscription or plan validity, where applicable.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Redemption history, QR-code validation and usage status.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Refund, cancellation, dispute and customer-support records.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "This information enables STRIKE to process transactions, administer entitlements, verify eligible redemptions, maintain transaction records and assist with complaints or disputes.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "subheading": "3.4 Payment Information"
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Payments made through STRIKE may be processed by Razorpay or another payment service provider appointed by STRIKE.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Payment-related information may include transaction identifiers, payment status, order references, refunds and other information necessary to reconcile transactions.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Your payment provider may independently collect and process information such as payment instrument details, billing information and authentication data in accordance with its own terms, privacy policy and applicable regulations.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE does not intend to collect or store your complete card number, card security code, UPI PIN or banking authentication credentials on its own systems.",
+                "bold": true
+              },
+              {
+                "kind": "text",
+                "text": " Such information should be entered only into the authorised payment provider’s secure payment interface.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "subheading": "3.5 Camera and QR-Code Information"
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE may request camera permission to enable the scanning of vendor or customer QR codes or other codes used by supported Platform features.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Camera access is intended to support the relevant scanning function. STRIKE does not intend to use this permission to capture photographs or videos unrelated to that function.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "If a scanned QR code contains or refers to transaction, vendor or redemption information, the relevant data may be processed to verify an offer, membership or other eligible benefit.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "You may deny or revoke camera permission through your device settings, although QR-based features may then be unavailable.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "subheading": "3.6 Device, Technical and Usage Information"
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "When you use STRIKE, we and our authorised technical service providers may process certain technical information, where collected by the application or its underlying infrastructure, including:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Device type, operating system and application version.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "IP address and basic network information.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Application logs, diagnostic information and crash reports.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Session information and timestamps.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Feature interactions and usage events.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Security-related events and authentication logs.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "This information may be used to troubleshoot technical issues, improve application stability, protect accounts, detect fraud and understand how the Platform is used.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE does not intend to collect an Advertising ID as part of its current stated data-collection design. If our implementation or use of third-party software changes, we will update the relevant disclosures and permissions as required.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "subheading": "3.7 Communications and Customer Support"
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "When you contact STRIKE, we may collect the information you choose to provide, including your name, contact details, transaction references, complaint details and communications with our support team.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "We use this information to answer enquiries, resolve complaints, investigate disputed transactions and improve our services.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "subheading": "3.8 Vendor and Business Information"
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Participating vendors may provide business-related information such as their business name, location, contact information, operating details, products, services, offers, membership benefits and redemption rules.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Where a vendor’s representative uses a STRIKE business account, we may also process the representative’s name, contact details, account credentials and activity records as necessary to administer the business relationship.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Vendor information may be displayed to users to facilitate discovery and use of available offers and services.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "subheading": "3.9 STRIKE Vendor App"
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "When a participating business uses the STRIKE Vendor app, we process the following information in addition to the categories above:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Registration and store details:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " business name, owner name, business address, mobile number, email address, store category and description, store timings, holidays and open or closed status.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Store location:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " the latitude and longitude of the store. The app requests precise device location only when you choose to detect your store location automatically during registration, and only while the app is in use; you may enter the coordinates manually instead.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Store images:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " a store banner image you choose from your photo library. The image is compressed on your device before it is uploaded.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Menu, cards and offers:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " menu items and prices, membership card details and coupon requests you create.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Payout details:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " when you request a withdrawal of your earnings, your bank account number, account holder name and IFSC code, or your UPI ID, together with the withdrawal amount. Your most recently used payout details are saved so that the withdrawal form can be pre-filled.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Earnings records:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " card purchases at your store, commission records, redemptions, Pay-at-Store payment confirmations and withdrawal requests.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Notification token:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " if you allow notifications, a Firebase Cloud Messaging device token, together with your device platform, device name and app version, so that we can send you alerts about activity at your store.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Your mobile number is verified with a one-time password through Google Firebase Authentication. After you sign in, your session tokens are stored in encrypted storage on your device and are removed when you sign out. The STRIKE Vendor app does not use your microphone.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "4. How We Use Your Information",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Subject to applicable law and the purposes disclosed to you, STRIKE may use personal information for the following purposes:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "numbered": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Account management:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " To create, authenticate, maintain and secure your account.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Service delivery:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " To provide access to food cards, meal plans, memberships, offers and other available Platform features.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Vendor discovery:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " To display relevant participating businesses and location-dependent offers.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Transaction processing:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " To process purchases, verify payments, record redemptions and administer refunds or cancellations.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Membership administration:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " To verify membership eligibility, plan validity, usage limits and available benefits.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "QR verification:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " To validate eligible vendor visits, offer redemptions or other supported transactions.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Customer support:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " To respond to questions, complaints, refund requests and disputes.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Communication:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " To send account verification messages, transaction confirmations, service notices, security alerts and important policy updates.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Personalisation:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " To present relevant vendors, categories, offers and features based on your stated preferences and permitted usage information.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Security and fraud prevention:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " To detect suspicious activities, unauthorised access, fraudulent redemptions and misuse of the Platform.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Platform improvement:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " To diagnose errors, improve performance, test features and understand aggregated usage patterns.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Legal compliance:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " To comply with applicable laws, lawful requests, tax obligations, accounting requirements and regulatory requirements.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Business operations:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " To maintain records, administer vendor relationships, process vendor payouts and support legitimate business operations.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Marketing communications:",
+                  "bold": true
+                },
+                {
+                  "kind": "text",
+                  "text": " To send promotional communications where permitted by applicable law and, where required, with your consent.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Where processing is based on consent, you may withdraw that consent through the applicable mechanism, subject to legal requirements and the consequences explained in this Policy.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "5. Cookies and Similar Technologies",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Where STRIKE operates a website or uses web-based features, cookies or similar technologies may be used where applicable to:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Maintain sessions and authenticate users.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Remember preferences.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Improve website functionality.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Measure performance and diagnose technical issues.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Understand aggregated traffic and usage patterns.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "The use of these technologies depends on the services and technical integrations actually deployed.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "You may manage cookies through your browser settings where supported. Disabling certain cookies may affect the operation of some website features.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "6. How We Share Your Information",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE does not intend to sell users’ personal information as a standalone commercial product.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "We may share information with the following categories of recipients when necessary for the purposes described in this Policy and subject to applicable law.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "subheading": "6.1 Participating Vendors and Businesses"
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "We may share relevant information with the vendor or business you choose to engage with so that it can verify your purchase, validate an eligible offer, confirm membership benefits, process a redemption or provide the relevant service.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "For example, a participating restaurant may need a transaction reference or redemption status to verify a STRIKE food card or meal-plan entitlement.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "We aim to limit vendor access to the information reasonably required for the relevant transaction or service.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Vendors are responsible for handling information they receive in accordance with applicable law and their own legal obligations. They must not assume that STRIKE authorises them to use your information for unrelated purposes.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "subheading": "6.2 Payment Service Providers"
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "We may share transaction and other necessary information with Razorpay or another authorised payment provider to facilitate payment processing, transaction verification, refunds, dispute resolution and fraud prevention.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Payment providers may process information under their own privacy policies and applicable regulatory requirements.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "subheading": "6.3 Authentication, Hosting and Technical Service Providers"
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "We may use third-party providers for services such as:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Google sign-in or other authentication functions.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Cloud hosting and database infrastructure.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Application maintenance and technical support.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Security monitoring and fraud prevention.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Diagnostic tools and permitted analytics.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Communication and notification delivery.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Such providers may process relevant information on our behalf to provide the services for which they have been engaged, subject to applicable contractual and legal safeguards.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "In the STRIKE Vendor app, these providers include Google Firebase Authentication, for mobile-number verification, and Firebase Cloud Messaging, for push notifications.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "subheading": "6.4 Legal and Regulatory Authorities"
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "We may disclose information where reasonably necessary to:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Comply with applicable law or a lawful order.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Respond to a valid request from an authorised public authority.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Investigate suspected fraud, unlawful activity or security incidents.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Establish, exercise or defend legal claims.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Protect the rights, safety and property of STRIKE, its users, participating businesses or other persons.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "We will handle such disclosures in accordance with applicable law.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "subheading": "6.5 Business Transfers"
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "If STRIKE undergoes a merger, acquisition, restructuring, financing, sale of assets or similar corporate transaction, relevant information may be transferred to the parties involved where legally permitted and subject to appropriate safeguards.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "subheading": "6.6 With Your Direction or Consent"
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "We may disclose information where you specifically request or authorise the disclosure, or where another lawful basis permits it.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE does not authorise unrelated third parties to access personal information merely because they participate in the same business ecosystem.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "7. Location Permissions and User Control",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE may request access to your device’s location to show nearby participating businesses or support a location-dependent service.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "You can manage location permissions through your device settings. You may also be able to enter an address manually where the relevant feature supports it.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "If you disable location access, nearby vendor discovery or certain delivery-related features may become less accurate or unavailable.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "We will use location information only for disclosed purposes and other purposes permitted by applicable law.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "8. Data Retention and Deletion",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE retains personal information only for as long as reasonably necessary to fulfil the purposes for which it was collected, subject to applicable law.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Retention periods may vary according to the category of information and the reason it is held. For example:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Account information may be retained while your account remains active.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Transaction and financial records may be retained for applicable accounting, tax, payment, audit or legal requirements.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Customer-support and dispute records may be retained until the relevant matter is resolved and for any necessary subsequent period.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Security and diagnostic records may be retained for an appropriate period to investigate incidents and protect the Platform.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Information that no longer needs to identify you may be deleted, anonymised or aggregated where appropriate.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "When information is no longer required, STRIKE will take reasonable steps to delete it or render it non-identifiable, subject to applicable legal obligations and legitimate retention requirements.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "subheading": "Account Deletion"
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "You may request deletion of your STRIKE account and associated personal information by emailing ",
+                "bold": false
+              },
+              {
+                "kind": "link",
+                "text": "support.striketechnologies@gmail.com",
+                "href": "mailto:support.striketechnologies@gmail.com",
+                "bold": false
+              },
+              {
+                "kind": "text",
+                "text": " from your registered email address, stating your registered mobile number. In the STRIKE Vendor app, you can start this request from Profile → Delete Account, which prepares the request email for you.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "We may contact you to verify that the request came from you before acting on it. Signing out of the app or uninstalling it does not delete your account.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Account deletion requests will be processed in accordance with applicable law and the Platform’s operational requirements. Information that must lawfully be retained for financial records, fraud prevention, dispute resolution or other legal obligations may be retained for the necessary period, with access and use appropriately restricted where required.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Deleting your account may result in the loss of access to unused offers, memberships, meal-plan benefits or other account-linked entitlements, subject to applicable consumer rights and the relevant terms.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "9. Data Security",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE takes reasonable technical and organisational measures designed to protect personal information against unauthorised access, disclosure, alteration, loss, misuse or destruction.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Depending on the systems deployed, these measures may include:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Access controls and permission management.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Authentication and account-security safeguards.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Secure communication and data transmission practices.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Monitoring for suspicious activity.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Restricted access to business and administrative systems.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Appropriate safeguards for third-party service providers.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Procedures for responding to security incidents.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "No electronic transmission or storage system can be guaranteed to be completely secure. Although we work to protect your information, we cannot promise absolute security.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "You are responsible for maintaining the confidentiality of your account credentials and promptly reporting suspected unauthorised access.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Where a personal data breach triggers a notification obligation under applicable law, STRIKE will take the required steps to notify affected individuals and relevant authorities.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "10. Third-Party Services and External Links",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "The STRIKE Platform may integrate with or direct users to third-party services, including payment gateways, authentication providers and participating businesses.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Your interaction with such services may be governed by their own terms and privacy policies.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE does not control the independent privacy practices of third parties and cannot guarantee how they process information outside STRIKE’s control. However, where a third party processes information on our behalf, we will take appropriate steps to address applicable privacy and security obligations.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "We encourage users to review the privacy policies of relevant third-party services before providing information directly to them.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "11. Children and Minors",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE recognises the importance of protecting children’s personal information.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Where minors are permitted to use the Platform under STRIKE’s Terms & Conditions, applicable law and the relevant service requirements, the collection and processing of their personal information will be subject to the safeguards and consent requirements prescribed by applicable law.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Where verifiable parental or guardian consent is legally required, STRIKE will obtain such consent before undertaking the relevant processing and will apply any additional safeguards required by law.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE will not knowingly process children’s personal information in a manner prohibited by applicable law.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Parents or lawful guardians who believe that a child’s information has been provided or processed inappropriately may contact STRIKE using the contact details below. STRIKE will assess such requests and take appropriate action in accordance with applicable law.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "12. Your Privacy Rights and Choices",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Subject to applicable law, you may have rights to:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Obtain information about the personal data STRIKE processes about you.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Request correction or updating of inaccurate or incomplete information.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Request deletion of personal information where legally available.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Withdraw consent for processing where processing is based on consent.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Raise a grievance concerning the handling of your personal information.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Nominate another person to exercise applicable rights in the event of death or incapacity, where provided under applicable law.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "To exercise an applicable right, contact us using the details in Section 16. We may request reasonable information to verify your identity and protect your account before acting on your request.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "We will respond within the period prescribed by applicable law.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Withdrawal of consent does not affect processing lawfully completed before withdrawal. It may also affect our ability to provide features that depend on the relevant information.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "You may opt out of promotional communications using an available unsubscribe mechanism or by contacting us. Essential account, security, transactional and legally required notices may continue where necessary.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "13. Data Protection and Applicable Law",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE intends to handle personal information in accordance with applicable Indian laws and regulations, including, as applicable to the relevant processing and effective legal provisions:",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "bullets": [
+              [
+                {
+                  "kind": "text",
+                  "text": "The Digital Personal Data Protection Act, 2023 and the applicable rules made under it.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "The Information Technology Act, 2000 and applicable rules.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Applicable consumer-protection and electronic-commerce requirements.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Applicable tax, accounting and payment-related obligations.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "The applicability and commencement of particular statutory obligations may depend on the relevant legal provisions and implementation timelines.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Where required, STRIKE will provide appropriate privacy notices, obtain valid consent, facilitate applicable rights, maintain reasonable security safeguards and comply with legal obligations relating to retention, deletion and personal data breaches.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "14. Cross-Border Processing",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE may use third-party technology or infrastructure providers whose operations or systems are located in India or other jurisdictions.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Where personal information is transferred, accessed or processed outside India, STRIKE will comply with applicable Indian legal requirements and any relevant restrictions or safeguards governing such transfers.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "The locations of STRIKE’s hosting, backup and third-party processing systems depend on the infrastructure deployed.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "15. Changes to This Privacy Policy",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE may update this Privacy Policy from time to time to reflect changes in its services, technical systems, business practices or legal obligations.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "The revised version will be published on the STRIKE Platform or another appropriate public location, together with an updated effective date.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Where a change materially affects the purposes of processing, the information collected or the rights of users, STRIKE will provide appropriate notice and obtain fresh consent where required by applicable law.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "We encourage users to review this Policy periodically.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "16. Grievance Redressal and Contact Information",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "If you have any questions, concerns, requests or complaints regarding the collection, use, disclosure, retention or deletion of your personal information, you may contact STRIKE using the details below.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Platform:",
+                "bold": true
+              },
+              {
+                "kind": "text",
+                "text": " STRIKE",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Legal entity:",
+                "bold": true
+              },
+              {
+                "kind": "text",
+                "text": " Strike Technologies Private Limited",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Registered office:",
+                "bold": true
+              },
+              {
+                "kind": "text",
+                "text": " Flat No. 305, Tirumala Enclave Apartment, Chirala, Prakasam, Bapatla District, Andhra Pradesh, India – 523155",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Email:",
+                "bold": true
+              },
+              {
+                "kind": "text",
+                "text": " ",
+                "bold": false
+              },
+              {
+                "kind": "link",
+                "text": "support.striketechnologies@gmail.com",
+                "href": "mailto:support.striketechnologies@gmail.com",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Phone:",
+                "bold": true
+              },
+              {
+                "kind": "text",
+                "text": " ",
+                "bold": false
+              },
+              {
+                "kind": "link",
+                "text": "8143604709",
+                "href": "tel:+918143604709",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Website:",
+                "bold": true
+              },
+              {
+                "kind": "text",
+                "text": " ",
+                "bold": false
+              },
+              {
+                "kind": "link",
+                "text": "www.strikeapp.in",
+                "href": "https://www.strikeapp.in",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Please include sufficient details to help us identify your account and understand your request. Do not include passwords, UPI PINs, complete card details or other authentication secrets in your communication.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "STRIKE will review privacy-related requests and grievances and respond in accordance with applicable law.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "If STRIKE is required to appoint a designated grievance officer or data protection officer under applicable law, the relevant name, designation and contact details will be published on the Platform.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "17. Your Acknowledgement",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "By accessing or using STRIKE, you acknowledge that you have been provided access to this Privacy Policy.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Where processing requires consent, your personal information will be processed on the basis of consent or another lawful basis available under applicable law, as appropriate to the circumstances.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "This Privacy Policy is intended to explain STRIKE’s data-handling practices transparently. It does not override any rights available to you under applicable law.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "company": {
+      "legalName": "Strike Technologies Private Limited",
+      "registeredOffice": "Flat No. 305, Tirumala Enclave Apartment, Chirala, Prakasam, Bapatla District, Andhra Pradesh, India – 523155",
+      "supportEmail": "support.striketechnologies@gmail.com",
+      "supportPhone": "8143604709",
+      "supportPhoneE164": "+918143604709",
+      "website": "www.strikeapp.in",
+      "websiteUrl": "https://www.strikeapp.in"
+    }
+  },
+  "accountDeletion": {
+    "title": "Delete Your Account",
+    "lastUpdated": "22 October 2026",
+    "isDraft": false,
+    "sections": [
+      {
+        "heading": "Strike Vendor account deletion",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "The Strike Vendor app is provided by Strike Technologies Private Limited. You can ask us to delete your Strike Vendor account and the personal information associated with it.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Signing out of the app or uninstalling it does not delete your account.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "How to request deletion",
+        "body": [
+          {
+            "numbered": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Email ",
+                  "bold": false
+                },
+                {
+                  "kind": "link",
+                  "text": "support.striketechnologies@gmail.com",
+                  "href": "mailto:support.striketechnologies@gmail.com",
+                  "bold": false
+                },
+                {
+                  "kind": "text",
+                  "text": " from the email address registered on your vendor account, with the subject “Account deletion request – Strike Vendor”. In the app, the button below prepares this email for you.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "Include your registered mobile number and business (shop) name so that we can identify your account.",
+                  "bold": false
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "We may contact you on your registered mobile number or email address to confirm that the request came from you before acting on it.",
+                  "bold": false
+                }
+              ]
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "You do not need the app installed to make a request.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "What is deleted and what is kept",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "When your request is processed, we delete your account and associated personal information, in accordance with applicable law and the Platform’s operational requirements.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Information that must lawfully be retained — such as financial records of card purchases, redemptions, commissions and withdrawals, and records needed for fraud prevention, dispute resolution or other legal obligations — may be retained for the necessary period, with access and use appropriately restricted.",
+                "bold": false
+              }
+            ]
+          },
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "Active memberships held by customers at your store, and any amounts due to or from you, are handled under the STRIKE Terms & Conditions and applicable law.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "heading": "Questions",
+        "body": [
+          {
+            "paragraph": [
+              {
+                "kind": "text",
+                "text": "We will respond within the period prescribed by applicable law. For questions, contact ",
+                "bold": false
+              },
+              {
+                "kind": "link",
+                "text": "support.striketechnologies@gmail.com",
+                "href": "mailto:support.striketechnologies@gmail.com",
+                "bold": false
+              },
+              {
+                "kind": "text",
+                "text": " or call ",
+                "bold": false
+              },
+              {
+                "kind": "link",
+                "text": "8143604709",
+                "href": "tel:+918143604709",
+                "bold": false
+              },
+              {
+                "kind": "text",
+                "text": ". Our Privacy Policy explains how we handle your information.",
+                "bold": false
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "company": {
+      "legalName": "Strike Technologies Private Limited",
+      "registeredOffice": "Flat No. 305, Tirumala Enclave Apartment, Chirala, Prakasam, Bapatla District, Andhra Pradesh, India – 523155",
+      "supportEmail": "support.striketechnologies@gmail.com",
+      "supportPhone": "8143604709",
+      "supportPhoneE164": "+918143604709",
+      "website": "www.strikeapp.in",
+      "websiteUrl": "https://www.strikeapp.in"
+    }
+  }
+}

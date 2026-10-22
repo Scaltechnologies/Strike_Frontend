@@ -223,6 +223,13 @@ export default function ProfileScreen() {
       subtitle: 'Hours, holidays, and location',
       onPress: () => router.push('/(main)/store-settings'),
     },
+    {
+      id: 'delete-account',
+      icon: 'trash-outline',
+      label: 'Delete Account',
+      subtitle: 'Request deletion of your account and data',
+      onPress: () => router.push('/account-deletion'),
+    },
   ];
 
   const supportRows: NavRowDef[] = [
@@ -237,7 +244,13 @@ export default function ProfileScreen() {
       id: 'terms',
       icon: 'document-text-outline',
       label: 'Terms & Conditions',
-      onPress: () => {},
+      onPress: () => router.push('/terms'),
+    },
+    {
+      id: 'privacy',
+      icon: 'shield-checkmark-outline',
+      label: 'Privacy Policy',
+      onPress: () => router.push('/privacy-policy'),
     },
   ];
 
