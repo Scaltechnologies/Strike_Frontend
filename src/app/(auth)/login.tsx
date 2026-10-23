@@ -116,9 +116,9 @@ export default function LoginScreen() {
 
         <Text style={styles.termsText}>
           By continuing you agree to our{' '}
-          <Text style={styles.termsLink}>Terms</Text>
+          <Text style={styles.termsLink} onPress={() => router.push('/terms')}>Terms</Text>
           {' & '}
-          <Text style={styles.termsLink}>Privacy Policy</Text>
+          <Text style={styles.termsLink} onPress={() => router.push('/privacy-policy')}>Privacy Policy</Text>
         </Text>
       </View>
     </KeyboardAvoidingView>

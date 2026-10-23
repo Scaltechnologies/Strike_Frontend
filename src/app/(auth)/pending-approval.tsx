@@ -84,7 +84,7 @@ export default function PendingApprovalScreen() {
             <View style={styles.infoText}>
               <Text style={styles.infoLabel}>Contact support</Text>
               <Text style={styles.infoDesc}>
-                If you have questions, reach us at support@strike.in
+                If you have questions, reach us at support.striketechnologies@gmail.com
               </Text>
             </View>
           </View>
@@ -97,6 +97,14 @@ export default function PendingApprovalScreen() {
         >
           <Ionicons name="log-out-outline" size={18} color={DS.primary} />
           <Text style={styles.logoutText}>Sign Out</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.deleteLink}
+          onPress={() => router.push('/account-deletion')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.deleteLinkText}>Delete my account</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -147,4 +155,7 @@ const styles = StyleSheet.create({
     backgroundColor: DS.surface,
   },
   logoutText: { fontSize: 15, fontWeight: '700', color: DS.primary },
+
+  deleteLink:     { marginTop: 16, paddingVertical: 8, paddingHorizontal: 16 },
+  deleteLinkText: { fontSize: 13, fontWeight: '600', color: DS.text2, textDecorationLine: 'underline' },
 });
