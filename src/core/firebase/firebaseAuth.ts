@@ -16,7 +16,7 @@ import {
 } from '@react-native-firebase/auth';
 import type { ConfirmationResult, User } from '@react-native-firebase/auth';
 
-const INDIAN_MOBILE_REGEX = /^[6-9]\d{9}$/;
+export const INDIAN_MOBILE_REGEX = /^[6-9]\d{9}$/;
 
 function toE164IndianPhone(phoneNumber: string): string {
   const digits = phoneNumber.trim();

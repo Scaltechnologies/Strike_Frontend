@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useRegister } from '../../modules/auth/hooks/useAuth';
 import BannerPicker from '../../modules/store/components/BannerPicker';
+import { INDIAN_MOBILE_REGEX } from '../../core/firebase/firebaseAuth';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -47,6 +48,7 @@ export default function SignupScreen() {
   const [locLoading, setLocLoading]     = useState(false);
   const [locError, setLocError]         = useState<string | null>(null);
   const [bannerUri, setBannerUri]       = useState<string | null>(null);
+  const [mobileTouched, setMobileTouched] = useState(!!paramPhone);
 
   const scrollRef    = useRef<ScrollView>(null);
   const hotelNameRef = useRef<TextInputRef>(null);
@@ -72,7 +74,9 @@ export default function SignupScreen() {
   };
 
   const coordsSet    = latitude.trim().length > 0 && longitude.trim().length > 0;
-  const isFormValid  = !!(hotelName.trim() && address.trim() && email.trim() && mobileNumber.trim() && coordsSet);
+  const mobileValid  = INDIAN_MOBILE_REGEX.test(mobileNumber.trim());
+  const showMobileError = mobileTouched && mobileNumber.trim().length > 0 && !mobileValid;
+  const isFormValid  = !!(hotelName.trim() && address.trim() && email.trim() && mobileValid && coordsSet);
 
   const handleDetectLocation = async () => {
     try {
@@ -196,7 +200,7 @@ export default function SignupScreen() {
         />
 
         <Text style={styles.inputLabel}>Mobile Number *</Text>
-        <View style={styles.phoneRow}>
+        <View style={[styles.phoneRow, showMobileError && styles.phoneRowError]}>
           <View style={styles.countryChip}>
             <Text style={styles.countryText}>+91</Text>
           </View>
@@ -207,15 +211,24 @@ export default function SignupScreen() {
             placeholder="98765 43210"
             placeholderTextColor={DS.text3}
             value={mobileNumber}
-            onChangeText={setMobileNumber}
+            onChangeText={(text) => setMobileNumber(text.replace(/[^0-9]/g, ''))}
             keyboardType="phone-pad"
             maxLength={10}
             editable={!paramPhone}
             onFocus={() => scrollToInput(mobileRef)}
+            onBlur={() => setMobileTouched(true)}
             returnKeyType="done"
             onSubmitEditing={() => Keyboard.dismiss()}
           />
         </View>
+        {showMobileError && (
+          <View style={styles.errorRow}>
+            <Ionicons name="alert-circle-outline" size={14} color={DS.primary} />
+            <Text style={styles.errorText}>
+              Enter a valid 10-digit mobile number starting with 6-9.
+            </Text>
+          </View>
+        )}
 
         {/* ── LOCATION ── */}
         <Text style={styles.sectionLabel}>LOCATION</Text>
@@ -363,6 +376,7 @@ const styles = StyleSheet.create({
     backgroundColor: DS.bg, borderWidth: 1.5, borderColor: DS.border,
     borderRadius: 12, marginBottom: 16, overflow: 'hidden', height: 52,
   },
+  phoneRowError: { borderColor: DS.primary },
   countryChip:  { paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
   countryText:  { fontSize: 15, fontWeight: '600', color: DS.text2 },
   phoneDivider: { width: 1, height: 28, backgroundColor: DS.border },
