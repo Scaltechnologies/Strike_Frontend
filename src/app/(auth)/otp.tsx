@@ -39,14 +39,21 @@ export default function OtpScreen() {
 
   // Android can verify the number automatically (SIM in this device), often
   // without delivering an SMS at all — continue on the vendor's behalf instead
-  // of waiting for a code that would then be rejected as "session expired".
+  // of making them wait for / type a code.
   const verifyRef = useRef(handleVerifyOtp);
   verifyRef.current = handleVerifyOtp;
   const autoVerifyStarted = useRef(false);
+  // Number already verified by Firebase — Verify only retries the backend step
+  // (e.g. after a network error), so it must work without a typed code.
+  const [autoVerified, setAutoVerified] = useState(false);
   useEffect(() => {
-    return onPhoneAutoVerified(() => {
+    return onPhoneAutoVerified((_user, code) => {
       if (autoVerifyStarted.current) return;
       autoVerifyStarted.current = true;
+      setAutoVerified(true);
+      // Show the auto-read code so the vendor sees why it moved on.
+      const digits = (code ?? '').replace(/\D/g, '').slice(0, OTP_LENGTH);
+      if (digits.length === OTP_LENGTH) setOtp(digits.split(''));
       verifyRef.current(phoneNumber, '', bannerUri || undefined);
     });
   }, [phoneNumber, bannerUri]);
@@ -62,6 +69,7 @@ export default function OtpScreen() {
     try {
       await handleResend(phoneNumber);
       autoVerifyStarted.current = false;
+      setAutoVerified(false);
       setOtp(Array(OTP_LENGTH).fill(''));
       inputs.current[0]?.focus();
     } catch {
@@ -112,12 +120,12 @@ export default function OtpScreen() {
 
   const onVerify = () => {
     const code = otp.join('');
-    if (code.length < OTP_LENGTH) return;
+    if (code.length < OTP_LENGTH && !autoVerified) return;
     handleVerifyOtp(phoneNumber, code, bannerUri || undefined);
   };
 
   const maskedPhone = phoneNumber ? `+91 XXXXXX${phoneNumber.slice(-4)}` : '';
-  const canSubmit = otp.join('').length === OTP_LENGTH && !loading;
+  const canSubmit = (otp.join('').length === OTP_LENGTH || autoVerified) && !loading;
 
   return (
     <KeyboardAvoidingView

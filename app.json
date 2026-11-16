@@ -25,7 +25,7 @@
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.strike.frontend",
-      "versionCode": 3,
+      "versionCode": 4,
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
