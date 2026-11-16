@@ -2,7 +2,15 @@
   "expo": {
     "name": "Strike Vendor",
     "slug": "scalatechnologies",
-    "version": "1.0.0",
+    "version": "1.0.1",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/208fbff4-8198-43ba-b48d-f85c9c3f5353",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "scheme": "strike-frontend",
     "icon": "./assets/icon.png",
     "platforms": [
@@ -17,6 +25,7 @@
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.strike.frontend",
+      "versionCode": 3,
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [

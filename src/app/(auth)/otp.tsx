@@ -9,6 +9,7 @@ import TextInput, { type TextInputRef } from '../../components/TextInput';
 import { useState, useRef, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useVerifyOtp, useResendOtp } from '../../modules/auth/hooks/useAuth';
+import { onPhoneAutoVerified } from '../../core/firebase/firebaseAuth';
 
 const RESEND_COOLDOWN_SECONDS = 30;
 
@@ -36,6 +37,20 @@ export default function OtpScreen() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const inputs = useRef<(TextInputRef | null)[]>([]);
 
+  // Android can verify the number automatically (SIM in this device), often
+  // without delivering an SMS at all — continue on the vendor's behalf instead
+  // of waiting for a code that would then be rejected as "session expired".
+  const verifyRef = useRef(handleVerifyOtp);
+  verifyRef.current = handleVerifyOtp;
+  const autoVerifyStarted = useRef(false);
+  useEffect(() => {
+    return onPhoneAutoVerified(() => {
+      if (autoVerifyStarted.current) return;
+      autoVerifyStarted.current = true;
+      verifyRef.current(phoneNumber, '', bannerUri || undefined);
+    });
+  }, [phoneNumber, bannerUri]);
+
   useEffect(() => {
     if (resendCooldown <= 0) return;
     const timer = setTimeout(() => setResendCooldown(c => c - 1), 1000);
@@ -46,6 +61,7 @@ export default function OtpScreen() {
     if (resendCooldown > 0 || resending) return;
     try {
       await handleResend(phoneNumber);
+      autoVerifyStarted.current = false;
       setOtp(Array(OTP_LENGTH).fill(''));
       inputs.current[0]?.focus();
     } catch {

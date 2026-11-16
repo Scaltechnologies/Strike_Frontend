@@ -27,6 +27,9 @@ function resolveAuthErrorMessage(err: any, fallback: string): string {
   if (err?.code === 'VENDOR_SUSPENDED' || /suspend/i.test(raw)) {
     return SUSPENDED_VENDOR_MESSAGE;
   }
+  if (/vendor not (found|registered)/i.test(raw)) {
+    return 'This number is not registered. Please sign up first.';
+  }
   return getUserMessage(err, fallback);
 }
 

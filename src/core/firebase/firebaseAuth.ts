@@ -10,6 +10,7 @@
 
 import {
   getAuth,
+  onAuthStateChanged,
   signInWithPhoneNumber,
   getIdToken as firebaseGetIdToken,
   signOut as firebaseSignOut,
@@ -31,38 +32,140 @@ function toE164IndianPhone(phoneNumber: string): string {
 // Replaced wholesale on every send/resend; consumed (single-use) on confirm.
 let confirmationResult: ConfirmationResult | null = null;
 
+// The Firebase user from the last successful confirm. Kept so that a retry
+// after a *backend* failure (e.g. firebase-verify rejecting the number) can
+// re-run the exchange instead of failing with "session expired" — the
+// ConfirmationResult itself can't be confirmed twice.
+let confirmedUser: User | null = null;
+
+// E164 number of the pending send — used to recognise an Android
+// auto-verification (see confirmPhoneOtp).
+let pendingPhone: string | null = null;
+
+// On Android, when the number belongs to the SIM in this device (the normal
+// case for a vendor registering on their own phone), Firebase auto-verifies
+// (instant verification / SMS auto-retrieval) and the native SDK signs the
+// user in by itself (RNFirebase's onVerificationCompleted). That consumes the
+// verification, so confirm(code) then fails with auth/session-expired even
+// though the number IS verified — and with instant verification no SMS may
+// arrive at all. So we watch auth state for the whole pending send and treat
+// a sign-in for the pending number as a successful verification.
+let authUnsubscribe: (() => void) | null = null;
+let confirmInFlight = false;
+const autoVerifyListeners = new Set<(user: User) => void>();
+
+function matchesPending(user: User | null): user is User {
+  return !!user && !!pendingPhone && user.phoneNumber === pendingPhone;
+}
+
+function autoVerifiedUser(): User | null {
+  const user = getAuth().currentUser;
+  return matchesPending(user) ? user : null;
+}
+
+function watchForAutoVerification(): void {
+  authUnsubscribe?.();
+  authUnsubscribe = onAuthStateChanged(getAuth(), (user) => {
+    if (!matchesPending(user) || confirmedUser) return;
+    confirmedUser = user;
+    confirmationResult = null;
+    // A manual confirm() in flight picks confirmedUser up itself — only tell
+    // the screen when the sign-in happened entirely on its own.
+    if (!confirmInFlight) {
+      autoVerifyListeners.forEach((cb) => cb(user));
+    }
+  });
+}
+
+// The native auto-sign-in races the confirm() rejection, so its auth-state
+// event may reach JS a moment later — wait briefly before giving up.
+async function waitForAutoVerifiedUser(timeoutMs: number): Promise<User | null> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const user = confirmedUser ?? autoVerifiedUser();
+    if (user) return user;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return confirmedUser ?? autoVerifiedUser();
+}
+
+// Lets the OTP screen continue automatically when Firebase verified the
+// number without the vendor typing a code. Fires immediately if that already
+// happened before the screen subscribed. Returns an unsubscribe function.
+export function onPhoneAutoVerified(cb: (user: User) => void): () => void {
+  autoVerifyListeners.add(cb);
+  if (confirmedUser && !confirmInFlight) cb(confirmedUser);
+  return () => {
+    autoVerifyListeners.delete(cb);
+  };
+}
+
 // Sends (or resends) a Firebase Phone Auth OTP to a 10-digit Indian mobile
 // number. Any previously pending confirmation is discarded — only the most
 // recently sent code is valid.
 export async function sendPhoneOtp(phoneNumber: string): Promise<void> {
   const formatted = toE164IndianPhone(phoneNumber);
+  authUnsubscribe?.();
+  authUnsubscribe = null;
   confirmationResult = null;
+  confirmedUser = null;
+  pendingPhone = formatted;
+  // Drop any Firebase user left from an earlier number so only a sign-in that
+  // happens for this send can count as auto-verification.
+  await signOutFirebase();
+  watchForAutoVerification();
   try {
-    confirmationResult = await signInWithPhoneNumber(getAuth(), formatted);
+    const result = await signInWithPhoneNumber(getAuth(), formatted);
+    // If auto-verification already completed, this confirmation is unusable.
+    if (!confirmedUser) confirmationResult = result;
   } catch (err) {
     throw new Error(mapFirebaseAuthError(err));
   }
 }
 
 // Confirms the OTP against the pending ConfirmationResult and returns the
-// signed-in Firebase user. Single-use — calling this again without a fresh
-// sendPhoneOtp() fails with a clear "session expired" error instead of
-// silently reusing a stale confirmation.
+// signed-in Firebase user. A wrong code leaves the confirmation pending so
+// the vendor can retype it; once verified (manually or automatically),
+// retries return the same user until the next sendPhoneOtp(). Only a
+// genuinely expired code/session forces a resend.
 export async function confirmPhoneOtp(code: string): Promise<User> {
+  const already = confirmedUser ?? autoVerifiedUser();
+  if (already) {
+    confirmationResult = null;
+    confirmedUser = already;
+    return already;
+  }
   if (!confirmationResult) {
+    const late = await waitForAutoVerifiedUser(1500);
+    if (late) return late;
     throw new Error('Your OTP session expired. Please request a new code.');
   }
+  let credential;
+  confirmInFlight = true;
   try {
-    const credential = await confirmationResult.confirm(code);
-    confirmationResult = null;
-    if (!credential?.user) {
-      throw new Error('Verification failed. Please try again.');
-    }
-    return credential.user;
+    credential = await confirmationResult.confirm(code);
   } catch (err) {
-    confirmationResult = null;
+    const errCode = (err as { code?: string } | null | undefined)?.code;
+    if (errCode === 'auth/code-expired' || errCode === 'auth/session-expired') {
+      // Usually the auto-verification above rather than a real expiry.
+      const late = await waitForAutoVerifiedUser(3000);
+      if (late) {
+        confirmationResult = null;
+        confirmedUser = late;
+        return late;
+      }
+      confirmationResult = null;
+    }
     throw new Error(mapFirebaseAuthError(err));
+  } finally {
+    confirmInFlight = false;
   }
+  if (!credential?.user) {
+    throw new Error('Verification failed. Please try again.');
+  }
+  confirmationResult = null;
+  confirmedUser = credential.user;
+  return credential.user;
 }
 
 // Firebase ID token — exchanged once for the backend Vendor JWT via
