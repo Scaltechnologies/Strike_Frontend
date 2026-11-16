@@ -27,7 +27,16 @@ function resolveAuthErrorMessage(err: any, fallback: string): string {
   if (err?.code === 'VENDOR_SUSPENDED' || /suspend/i.test(raw)) {
     return SUSPENDED_VENDOR_MESSAGE;
   }
+  if (/vendor not (found|registered)/i.test(raw)) {
+    return 'This number is not registered. Please sign up first.';
+  }
   return getUserMessage(err, fallback);
+}
+
+// Backend OtpService cooldown / hourly-cap messages (auth-service).
+function isLegacyOtpRateLimit(err: unknown): boolean {
+  const raw = err instanceof Error ? err.message : String(err ?? '');
+  return /before requesting another OTP|Too many OTP requests/i.test(raw);
 }
 
 // ── Send OTP Hook (Login flow) ────────────────────────────────────────
@@ -69,7 +78,9 @@ export const useResendOtp = () => {
     try {
       setLoading(true);
       setError(null);
-      await sendPhoneOtp(mobileNumber);
+      // forceResend: Firebase otherwise won't send a second SMS while the
+      // first request is still inside its timeout window.
+      await sendPhoneOtp(mobileNumber, { forceResend: true });
     } catch (err: any) {
       setError(resolveAuthErrorMessage(err, 'Failed to resend OTP'));
       throw err;
@@ -210,7 +221,16 @@ export const useRegister = () => {
         }
       }
 
-      await registerVendor({ ...payload, logoUrl });
+      try {
+        await registerVendor({ ...payload, logoUrl });
+      } catch (regErr) {
+        // /register also fires the backend's legacy OTP (unused — the real
+        // OTP comes from Firebase below), which has its own 60s cooldown and
+        // hourly cap. Those errors are thrown only AFTER the vendor row is
+        // saved, so on a retry they mean "already registered, pending" and
+        // must not block the vendor from getting their Firebase OTP.
+        if (!isLegacyOtpRateLimit(regErr)) throw regErr;
+      }
 
       // Only needed as a fallback when the immediate upload above didn't happen
       // or failed — if it succeeded, the Store will already get its banner at
