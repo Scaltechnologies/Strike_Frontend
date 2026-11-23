@@ -46,6 +46,11 @@ export default function LoginScreen() {
   const kb = useKeyboardAwareScroll();
   const keyboardOpen = kb.keyboardSpace > 0;
 
+  // Coming back from registration to this (already mounted) screen: use the new number.
+  useEffect(() => {
+    if (params.mobile) { setMobile(params.mobile); setPin(''); }
+  }, [params.mobile]);
+
   // Already signed in (e.g. opened from a link) — go straight in.
   // Otherwise pre-fill the number used last time, so only the PIN is needed.
   useEffect(() => {

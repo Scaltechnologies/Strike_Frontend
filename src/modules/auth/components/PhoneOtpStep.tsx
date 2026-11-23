@@ -6,7 +6,7 @@
 // token that proves the number to the backend.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Text from '../../../components/Text';
 import { type TextInputRef } from '../../../components/TextInput';
@@ -17,6 +17,7 @@ import {
   confirmPhoneOtp,
   getFirebaseIdToken,
   onPhoneAutoVerified,
+  getLastFirebaseErrorDetail,
 } from '../../../core/firebase/firebaseAuth';
 
 const RESEND_SECONDS = 60;
@@ -148,10 +149,15 @@ export default function PhoneOtpStep({ mobileNumber, onVerified, onChangeNumber,
       )}
 
       {!!error && (
-        <View style={styles.errorRow}>
+        // Long-press shows Firebase's full error (hidden support diagnostics).
+        <Pressable
+          style={styles.errorRow}
+          delayLongPress={800}
+          onLongPress={() => Alert.alert('Error details', getLastFirebaseErrorDetail() ?? 'No details available.')}
+        >
           <Ionicons name="alert-circle-outline" size={14} color={DS.primary} />
           <Text style={styles.errorText}>{error}</Text>
-        </View>
+        </Pressable>
       )}
 
       <TouchableOpacity

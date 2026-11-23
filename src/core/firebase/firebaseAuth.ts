@@ -310,6 +310,7 @@ export async function signOutFirebase(): Promise<void> {
 // unmapped code is indistinguishable from any other failure on device.
 export function mapFirebaseAuthError(error: unknown): string {
   const code = errorCode(error);
+  rememberErrorDetail(error);
 
   if (__DEV__) {
     console.warn('[firebaseAuth] error code:', code || 'unknown');
@@ -349,5 +350,31 @@ export function mapFirebaseAuthError(error: unknown): string {
     default:
       return `Something went wrong. Please try again.${suffix}`;
   }
+}
+
+// ── Hidden diagnostics ─────────────────────────────────────────────────
+// Firebase's own explanation of the last failure (e.g. "This app is not
+// authorized … [ A play_integrity_token was passed, but no matching SHA-256
+// was registered … ]"). A release build has no console, so the OTP screen
+// shows this only on a long-press of the error text — vendors never see it
+// unless asked to.
+let lastErrorDetail: string | null = null;
+
+function rememberErrorDetail(error: unknown): void {
+  const e = error as {
+    code?: string; message?: string;
+    userInfo?: { nativeErrorMessage?: string; nativeErrorCode?: string; message?: string };
+  } | null;
+  const parts = [
+    e?.code && `code: ${e.code}`,
+    e?.userInfo?.nativeErrorCode && `native code: ${e.userInfo.nativeErrorCode}`,
+    e?.userInfo?.nativeErrorMessage && `native: ${e.userInfo.nativeErrorMessage}`,
+    e?.message && `message: ${e.message}`,
+  ].filter(Boolean) as string[];
+  lastErrorDetail = parts.length ? parts.join('\n\n').slice(0, 1200) : null;
+}
+
+export function getLastFirebaseErrorDetail(): string | null {
+  return lastErrorDetail;
 }
 

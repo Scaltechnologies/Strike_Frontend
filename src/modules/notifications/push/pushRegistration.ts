@@ -31,17 +31,7 @@ export const URGENT_SOUND = 'vendor_alert_siren.wav';
 export const DEFAULT_CHANNEL_ID = 'default';
 export const DEFAULT_SOUND = 'notify.wav';
 
-export async function ensurePushPermissionAndRegister(): Promise<void> {
-  if (isRunningInExpoGo()) return;
-
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const Notifications = require('expo-notifications');
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const Device = require('expo-device');
-
-  // Simulators/emulators and web can't receive remote push — skip silently.
-  if (!Device.isDevice) return;
-
+async function ensureAndroidChannels(Notifications: any): Promise<void> {
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
       name: 'Strike Alerts',
@@ -58,6 +48,20 @@ export async function ensurePushPermissionAndRegister(): Promise<void> {
       bypassDnd: true,
     });
   }
+}
+
+export async function ensurePushPermissionAndRegister(): Promise<void> {
+  if (isRunningInExpoGo()) return;
+
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const Notifications = require('expo-notifications');
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const Device = require('expo-device');
+
+  // Simulators/emulators and web can't receive remote push — skip silently.
+  if (!Device.isDevice) return;
+
+  await ensureAndroidChannels(Notifications);
 
   const existing = await Notifications.getPermissionsAsync();
   let finalStatus = existing.status;
@@ -83,6 +87,50 @@ export async function ensurePushPermissionAndRegister(): Promise<void> {
   } catch {
     // Best-effort — the device stays registered locally and will retry next launch.
   }
+}
+
+export interface RegistrationPushInfo {
+  pushToken?: string;
+  pushPlatform?: 'ANDROID' | 'IOS';
+  deviceName?: string;
+  appVersion?: string;
+}
+
+/**
+ * For registration: asks for notification permission and returns this phone's FCM token,
+ * which is sent with the registration so the "account approved" push reaches the vendor
+ * before they can sign in. Never throws and never waits long — registration must not
+ * depend on it. Returns {} when unavailable (denied, emulator, Expo Go, timeout).
+ */
+export async function getPushInfoForRegistration(timeoutMs = 10000): Promise<RegistrationPushInfo> {
+  if (isRunningInExpoGo()) return {};
+  const work = (async (): Promise<RegistrationPushInfo> => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Notifications = require('expo-notifications');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Device = require('expo-device');
+    if (!Device.isDevice) return {};
+
+    await ensureAndroidChannels(Notifications);
+    let { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
+      ({ status } = await Notifications.requestPermissionsAsync());
+    }
+    setPushPermission(status === 'granted' ? 'granted' : 'denied');
+    if (status !== 'granted') return {};
+
+    const token = await getFcmToken();
+    if (!token) return {};
+    return {
+      pushToken: token,
+      pushPlatform: Platform.OS === 'ios' ? 'IOS' : 'ANDROID',
+      deviceName: Device.deviceName ?? undefined,
+      appVersion: Constants.expoConfig?.version,
+    };
+  })().catch(() => ({}));
+
+  const timeout = new Promise<RegistrationPushInfo>(resolve => setTimeout(() => resolve({}), timeoutMs));
+  return Promise.race([work, timeout]);
 }
 
 export async function deregisterCurrentPushToken(): Promise<void> {

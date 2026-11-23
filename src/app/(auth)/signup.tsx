@@ -43,11 +43,12 @@ const DS = {
   text3:       '#9BA3AF',
 };
 
-type Step = 'details' | 'otp' | 'pin';
+type Step = 'details' | 'otp' | 'pin' | 'done';
 const STEP_LABEL: Record<Step, string> = {
   details: 'Step 1 of 3 · Store details',
   otp:     'Step 2 of 3 · Verify mobile',
   pin:     'Step 3 of 3 · Create PIN',
+  done:    'Registration submitted',
 };
 
 export default function SignupScreen() {
@@ -111,12 +112,19 @@ export default function SignupScreen() {
     useCallback(() => {
       const sub = BackHandler.addEventListener('hardwareBackPress', () => {
         if (step === 'details') return false;
+        if (step === 'done') { goToSignIn(); return true; }
         goToStep(step === 'pin' ? 'otp' : 'details');
         return true;
       });
       return () => sub.remove();
-    }, [step, goToStep]),
+    }, [step, goToStep]), // eslint-disable-line react-hooks/exhaustive-deps
   );
+
+  // Back to the existing Sign in screen (or a fresh one if there isn't one below).
+  const goToSignIn = () => {
+    Keyboard.dismiss();
+    router.dismissTo({ pathname: '/(auth)/login', params: { registered: '1', mobile } });
+  };
 
   const mobile       = mobileNumber.trim();
   const coordsSet    = latitude.trim().length > 0 && longitude.trim().length > 0;
@@ -171,7 +179,11 @@ export default function SignupScreen() {
       firebaseIdToken: firebaseToken,
       pin,
     }, bannerUri ?? undefined);
-    if (!res.ok && res.otpProblem) {
+    if (res.ok) {
+      goToStep('done');
+      return;
+    }
+    if (res.otpProblem) {
       // OTP proof expired (e.g. the app sat on this step for a long time).
       setFirebaseToken(null);
       setVerifiedFor(null);
@@ -386,7 +398,7 @@ export default function SignupScreen() {
       {/* Brand Zone */}
       <View style={styles.brandZone}>
         <View style={[styles.brandContent, { paddingTop: insets.top + 24 }]}>
-          {step !== 'details' && (
+          {step !== 'details' && step !== 'done' && (
             <TouchableOpacity
               style={[styles.backBtn, { top: insets.top + 18 }]}
               onPress={() => goToStep(step === 'pin' ? 'otp' : 'details')}
@@ -442,6 +454,34 @@ export default function SignupScreen() {
             onSubmit={onCreatePin}
             onFocusField={(extra) => kb.ensureVisible(extra)}
           />
+        )}
+
+        {step === 'done' && (
+          <View style={styles.doneWrap}>
+            <View style={styles.doneIcon}>
+              <Ionicons name="checkmark" size={40} color="#fff" />
+            </View>
+            <Text style={styles.doneTitle}>Registration submitted</Text>
+            <Text style={styles.doneText}>
+              Thank you! Our team will review <Text style={styles.doneBold}>{hotelName.trim()}</Text>.
+            </Text>
+            <View style={styles.doneCard}>
+              <View style={styles.doneRow}>
+                <Ionicons name="notifications-outline" size={18} color={DS.primary} />
+                <Text style={styles.doneRowText}>We'll send a notification to this phone when your store is approved.</Text>
+              </View>
+              <View style={styles.doneRow}>
+                <Ionicons name="keypad-outline" size={18} color={DS.primary} />
+                <Text style={styles.doneRowText}>
+                  Then sign in with <Text style={styles.doneBold}>+91 {mobile}</Text> and the PIN you just created.
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity style={styles.primaryBtn} onPress={goToSignIn} activeOpacity={0.85}>
+              <Text style={styles.primaryBtnText}>Go to Sign in</Text>
+              <Ionicons name="arrow-forward" size={18} color="#fff" />
+            </TouchableOpacity>
+          </View>
         )}
 
         <View style={{ height: kb.keyboardSpace }} />
@@ -536,4 +576,17 @@ const styles = StyleSheet.create({
 
   termsText: { fontSize: 12, color: DS.text3, textAlign: 'center', lineHeight: 18 },
   termsLink:  { color: DS.primary, fontWeight: '600' },
+
+  // Done step
+  doneWrap:  { alignItems: 'stretch', paddingTop: 8 },
+  doneIcon: {
+    width: 72, height: 72, borderRadius: 36, backgroundColor: DS.success,
+    alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 18,
+  },
+  doneTitle: { fontSize: 22, fontWeight: '800', color: DS.text, textAlign: 'center', marginBottom: 8 },
+  doneText:  { fontSize: 15, color: DS.text2, textAlign: 'center', lineHeight: 22, marginBottom: 20 },
+  doneBold:  { fontWeight: '700', color: DS.text },
+  doneCard:  { backgroundColor: DS.bg, borderRadius: 14, padding: 16, gap: 14, marginBottom: 20 },
+  doneRow:   { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  doneRowText: { flex: 1, fontSize: 14, color: DS.text2, lineHeight: 20 },
 });
