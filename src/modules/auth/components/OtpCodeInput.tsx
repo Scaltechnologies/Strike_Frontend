@@ -1,6 +1,6 @@
 // src/modules/auth/components/OtpCodeInput.tsx
 //
-// Single 6-digit field (wide letter-spacing) for emailed verification codes.
+// Single 6-digit field (wide letter-spacing) for SMS OTP codes.
 // One input rather than six boxes so paste and OS autofill always work.
 
 import { forwardRef } from 'react';
@@ -15,10 +15,11 @@ type Props = {
   onComplete?: (code: string) => void;
   invalid?: boolean;
   editable?: boolean;
+  onFocus?: () => void;
 };
 
 const OtpCodeInput = forwardRef<TextInputRef, Props>(
-  ({ value, onChangeText, onComplete, invalid, editable = true }, ref) => (
+  ({ value, onChangeText, onComplete, invalid, editable = true, onFocus }, ref) => (
     <TextInput
       ref={ref}
       style={[styles.input, invalid && styles.invalid, !editable && styles.disabled]}
@@ -35,6 +36,7 @@ const OtpCodeInput = forwardRef<TextInputRef, Props>(
       autoComplete="one-time-code"
       maxLength={OTP_LENGTH + 2}
       editable={editable}
+      onFocus={onFocus}
       accessibilityLabel="6-digit verification code"
     />
   ),

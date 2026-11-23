@@ -9,9 +9,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSignIn } from '../../modules/auth/hooks/useAuth';
-import PasswordField from '../../modules/auth/components/PasswordField';
-import { isValidEmail } from '../../modules/auth/utils/validation';
-import { getAccessToken, getMustChangePassword } from '../../core/storage/secureStorage';
+import PinInput from '../../modules/auth/components/PinInput';
+import { isValidMobile, PIN_LENGTH } from '../../modules/auth/utils/validation';
+import { getAccessToken, getLastMobile } from '../../core/storage/secureStorage';
 import { useKeyboardAwareScroll } from '../../core/keyboard/useKeyboardAwareScroll';
 
 const DS = {
@@ -28,47 +28,57 @@ const DS = {
   text3:       '#9BA3AF',
 };
 
+// Errors where "Forgot PIN?" is the way forward.
+const FORGOT_CODES = new Set(['PIN_NOT_SET', 'ACCOUNT_LOCKED', 'PIN_RESET_REQUIRED']);
+
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
-  // registered=1 & email=… after a successful registration (useRegister);
-  // the email link (strike-frontend://login) arrives with no params.
-  const params = useLocalSearchParams<{ registered?: string; email?: string }>();
-  const { handleSignIn, loading, error, errorCode } = useSignIn();
+  // registered=1 & mobile=… after a successful registration (useRegister).
+  const params = useLocalSearchParams<{ registered?: string; mobile?: string }>();
+  const { handleSignIn, loading, error, errorCode, clearError } = useSignIn();
 
-  const [email, setEmail]       = useState(params.email ?? '');
-  const [password, setPassword] = useState('');
-  const [emailTouched, setEmailTouched] = useState(false);
-  const passwordRef = useRef<TextInputRef>(null);
+  const [mobile, setMobile] = useState(params.mobile ?? '');
+  const [pin, setPin]       = useState('');
+  const [reveal, setReveal] = useState(false);
+  const [mobileTouched, setMobileTouched] = useState(false);
+  const mobileRef = useRef<TextInputRef>(null);
+  const pinRef    = useRef<TextInputRef>(null);
   const kb = useKeyboardAwareScroll();
   const keyboardOpen = kb.keyboardSpace > 0;
 
-  // Opened from the email link while already signed in — don't make the
-  // vendor sign in again.
+  // Already signed in (e.g. opened from a link) — go straight in.
+  // Otherwise pre-fill the number used last time, so only the PIN is needed.
   useEffect(() => {
     (async () => {
       try {
-        if (!(await getAccessToken())) return;
-        if (await getMustChangePassword()) {
-          router.replace({ pathname: '/change-password', params: { forced: '1' } });
-        } else {
+        if (await getAccessToken()) {
           router.replace('/(main)/home');
+          return;
+        }
+        if (!params.mobile) {
+          const last = await getLastMobile();
+          if (last) setMobile(m => m || last);
         }
       } catch { /* stay on sign-in */ }
     })();
-  }, []);
+  }, [params.mobile]);
 
-  const emailOk   = isValidEmail(email);
-  const showEmailError = emailTouched && email.trim().length > 0 && !emailOk;
-  const canSubmit = emailOk && password.length > 0 && !loading;
-  const suggestForgot = errorCode === 'PASSWORD_NOT_SET' || errorCode === 'ACCOUNT_LOCKED';
+  const mobileOk = isValidMobile(mobile);
+  const showMobileError = mobileTouched && mobile.length > 0 && !mobileOk;
+  const canSubmit = mobileOk && pin.length === PIN_LENGTH && !loading;
+  const suggestForgot = FORGOT_CODES.has(errorCode ?? '');
+  const notRegistered = errorCode === 'NOT_REGISTERED';
 
-  const onSubmit = () => {
-    if (!canSubmit) return;
-    handleSignIn(email, password);
+  const submit = async (p = pin) => {
+    if (!mobileOk || p.length !== PIN_LENGTH || loading) return;
+    const ok = await handleSignIn(mobile, p);
+    if (!ok) {
+      setPin('');
+    }
   };
 
   const goForgot = () =>
-    router.push({ pathname: '/(auth)/forgot-password', params: emailOk ? { email: email.trim() } : {} });
+    router.push({ pathname: '/(auth)/forgot-pin', params: mobileOk ? { mobile } : {} });
 
   return (
     <KeyboardAvoidingView
@@ -77,8 +87,7 @@ export default function LoginScreen() {
     >
       <StatusBar barStyle="light-content" backgroundColor={DS.primary} />
 
-      {/* Brand Zone */}
-      {/* Collapses to just the wordmark while typing, to leave room for the form. */}
+      {/* Brand Zone — collapses to just the wordmark while typing. */}
       <View style={[styles.brandZone, keyboardOpen && styles.brandZoneCompact]}>
         <View style={[styles.brandContent, { paddingTop: insets.top + (keyboardOpen ? 10 : 36) }]}>
           {!keyboardOpen && (
@@ -107,58 +116,75 @@ export default function LoginScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.noticeTitle}>Registration submitted</Text>
               <Text style={styles.noticeText}>
-                Once our team approves your store, we'll email your login details
-                {params.email ? ` to ${params.email}` : ''}. Use them to sign in here.
+                Once our team approves your store, sign in here with your mobile number and the PIN you just created.
               </Text>
             </View>
           </View>
         )}
 
         <Text style={styles.formTitle}>Welcome back</Text>
-        <Text style={styles.formSubtitle}>Sign in to your vendor account</Text>
+        <Text style={styles.formSubtitle}>Sign in with your mobile number and PIN</Text>
 
-        <Text style={styles.inputLabel}>Email</Text>
-        <TextInput
-          style={[styles.input, showEmailError && styles.inputInvalid]}
-          placeholder="store@example.com"
-          placeholderTextColor={DS.text3}
-          value={email}
-          onChangeText={setEmail}
-          onBlur={() => setEmailTouched(true)}
-          onFocus={() => kb.ensureVisible()}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="email"
-          textContentType="username"
-          maxLength={254}
-          returnKeyType="next"
-          submitBehavior="submit"
-          onSubmitEditing={() => passwordRef.current?.focus()}
-        />
-        {showEmailError && (
+        <Text style={styles.inputLabel}>Mobile Number</Text>
+        <View style={[styles.phoneRow, showMobileError && styles.phoneRowError]}>
+          <View style={styles.countryChip}>
+            <Text style={styles.countryText}>+91</Text>
+          </View>
+          <View style={styles.phoneDivider} />
+          <TextInput
+            ref={mobileRef}
+            style={styles.phoneInput}
+            placeholder="98765 43210"
+            placeholderTextColor={DS.text3}
+            value={mobile}
+            onChangeText={(t) => {
+              const digits = t.replace(/\D/g, '').slice(0, 10);
+              setMobile(digits);
+              if (error) clearError();
+              if (isValidMobile(digits) && pin.length < PIN_LENGTH) {
+                setTimeout(() => pinRef.current?.focus(), 50);
+              }
+            }}
+            onBlur={() => setMobileTouched(true)}
+            onFocus={() => kb.ensureVisible(140)}
+            keyboardType="phone-pad"
+            autoComplete="tel"
+            textContentType="telephoneNumber"
+            maxLength={10}
+            returnKeyType="next"
+            onSubmitEditing={() => pinRef.current?.focus()}
+          />
+        </View>
+        {showMobileError && (
           <View style={styles.fieldError}>
             <Ionicons name="alert-circle-outline" size={14} color={DS.primary} />
-            <Text style={styles.errorText}>Enter a valid email address.</Text>
+            <Text style={styles.errorText}>Enter a valid 10-digit mobile number.</Text>
           </View>
         )}
 
-        <Text style={styles.inputLabel}>Password</Text>
-        <PasswordField
-          ref={passwordRef}
-          placeholder="Your password"
-          value={password}
-          onChangeText={setPassword}
-          // Keep the Sign In button visible under the field too.
+        <View style={styles.labelRow}>
+          <Text style={styles.inputLabel}>4-digit PIN</Text>
+          <TouchableOpacity onPress={() => setReveal(r => !r)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <View style={styles.revealRow}>
+              <Ionicons name={reveal ? 'eye-off-outline' : 'eye-outline'} size={16} color={DS.text2} />
+              <Text style={styles.revealText}>{reveal ? 'Hide' : 'Show'}</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+        <PinInput
+          ref={pinRef}
+          value={pin}
+          onChangeText={(v) => { setPin(v); if (error) clearError(); }}
+          onComplete={(p) => submit(p)}
+          // Keep the Sign In button visible under the boxes.
           onFocus={() => kb.ensureVisible(90)}
-          autoComplete="current-password"
-          textContentType="password"
-          returnKeyType="go"
-          onSubmitEditing={onSubmit}
+          reveal={reveal}
+          invalid={!!error && !notRegistered}
+          editable={!loading}
         />
 
         <TouchableOpacity style={styles.forgotRow} onPress={goForgot} hitSlop={{ top: 8, bottom: 8 }}>
-          <Text style={[styles.forgotText, suggestForgot && styles.forgotTextStrong]}>Forgot password?</Text>
+          <Text style={[styles.forgotText, suggestForgot && styles.forgotTextStrong]}>Forgot PIN?</Text>
         </TouchableOpacity>
 
         {!!error && (
@@ -170,7 +196,7 @@ export default function LoginScreen() {
 
         <TouchableOpacity
           style={[styles.primaryBtn, !canSubmit && styles.primaryBtnDisabled]}
-          onPress={onSubmit}
+          onPress={() => submit()}
           disabled={!canSubmit}
           activeOpacity={0.85}
         >
@@ -191,8 +217,8 @@ export default function LoginScreen() {
         </View>
 
         <TouchableOpacity
-          style={styles.secondaryBtn}
-          onPress={() => router.push('/(auth)/signup')}
+          style={[styles.secondaryBtn, notRegistered && styles.secondaryBtnStrong]}
+          onPress={() => router.push({ pathname: '/(auth)/signup', params: mobileOk ? { phoneNumber: mobile } : {} })}
           activeOpacity={0.85}
         >
           <Text style={styles.secondaryBtnText}>Create an account</Text>
@@ -248,17 +274,25 @@ const styles = StyleSheet.create({
   noticeText:  { fontSize: 13, color: DS.text2, lineHeight: 19 },
 
   // Inputs
-  inputLabel: { fontSize: 12, fontWeight: '600', color: DS.text2, marginBottom: 8 },
-  input: {
-    backgroundColor: DS.bg, borderWidth: 1.5, borderColor: DS.border,
-    borderRadius: 12, paddingHorizontal: 14, height: 52,
-    fontSize: 15, color: DS.text, marginBottom: 16,
-  },
-  inputInvalid: { borderColor: DS.primary },
-  fieldError: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -8, marginBottom: 14 },
+  inputLabel: { fontSize: 13, fontWeight: '600', color: DS.text2, marginBottom: 8 },
+  labelRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  revealRow:  { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 8 },
+  revealText: { fontSize: 13, color: DS.text2, fontWeight: '600' },
 
-  forgotRow: { alignSelf: 'flex-end', marginTop: -6, marginBottom: 18 },
-  forgotText: { fontSize: 13, color: DS.primary, fontWeight: '600' },
+  phoneRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: DS.bg, borderWidth: 1.5, borderColor: DS.border,
+    borderRadius: 12, marginBottom: 18, overflow: 'hidden', height: 56,
+  },
+  phoneRowError: { borderColor: DS.primary },
+  countryChip:  { paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
+  countryText:  { fontSize: 17, fontWeight: '700', color: DS.text2 },
+  phoneDivider: { width: 1, height: 28, backgroundColor: DS.border },
+  phoneInput:   { flex: 1, paddingHorizontal: 14, fontSize: 18, fontWeight: '600', color: DS.text, height: '100%', letterSpacing: 1 },
+  fieldError: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -10, marginBottom: 14 },
+
+  forgotRow: { alignSelf: 'flex-end', marginTop: 2, marginBottom: 18, paddingVertical: 4 },
+  forgotText: { fontSize: 14, color: DS.primary, fontWeight: '700' },
   forgotTextStrong: { textDecorationLine: 'underline' },
 
   // Error
@@ -284,6 +318,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: DS.primary,
     borderRadius: 14, height: 52, marginBottom: 20,
   },
+  secondaryBtnStrong: { backgroundColor: DS.primarySoft, borderWidth: 2 },
   secondaryBtnText: { fontSize: 16, fontWeight: '700', color: DS.primary },
 
   termsText: { fontSize: 12, color: DS.text3, textAlign: 'center', lineHeight: 18 },

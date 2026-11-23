@@ -1,6 +1,6 @@
 // src/modules/auth/hooks/useCountdown.ts — simple seconds countdown for "Resend code".
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 export const useCountdown = () => {
   const [seconds, setSeconds] = useState(0);
@@ -11,7 +11,9 @@ export const useCountdown = () => {
     return () => clearTimeout(t);
   }, [seconds]);
 
-  return { seconds, start: (s: number) => setSeconds(Math.max(0, Math.round(s))) };
+  // Stable identity so callers can use it in effect / callback deps.
+  const start = useCallback((s: number) => setSeconds(Math.max(0, Math.round(s))), []);
+  return { seconds, start };
 };
 
 // The backend's cooldown message ("Please wait 42 seconds…") → 42, so the
