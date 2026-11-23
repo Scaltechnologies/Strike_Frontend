@@ -22,8 +22,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
-        <Stack.Screen name="change-password" options={{ gestureEnabled: false }} />
-        <Stack.Screen name="change-email" />
+        <Stack.Screen name="change-pin" />
         <Stack.Screen name="terms" />
         <Stack.Screen name="privacy-policy" />
         <Stack.Screen name="account-deletion" />

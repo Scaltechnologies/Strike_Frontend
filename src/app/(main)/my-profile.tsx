@@ -59,9 +59,7 @@ const FIELDS: Field[] = [
   { key: 'shopName',    label: 'Shop Name',    placeholder: 'e.g. Sri Raghava Curry Point' },
   { key: 'ownerName',  label: 'Owner Name',   placeholder: 'e.g. Ravi Kumar' },
   { key: 'email',      label: 'Email',        placeholder: 'you@example.com', keyboardType: 'email-address',
-    // Profile email is contact info (vendor-service); the sign-in email lives in
-    // auth-service and is not changed by this form.
-    hint: "Contact email shown on your profile. To change the email you sign in with, use Profile → Change Sign-in Email." },
+    hint: "Optional contact email shown on your profile. You sign in with your mobile number and PIN." },
   { key: 'mobile',     label: 'Mobile',       placeholder: '+91 98765 43210', keyboardType: 'phone-pad' },
   { key: 'category',   label: 'Category',     placeholder: 'e.g. Restaurant, Cafe' },
   { key: 'description',label: 'Description',  placeholder: 'Brief description of your business', multiline: true },

@@ -1,20 +1,27 @@
+// Vendor registration — three steps:
+//   1. details  store info, mobile number, location (email optional)
+//   2. otp      Firebase SMS OTP to that mobile number
+//   3. pin      choose a 4-digit PIN → submitted for admin review
+// After approval the vendor signs in with mobile number + PIN.
+
 import {
-  View, TouchableOpacity, StyleSheet,
+  View, TouchableOpacity, StyleSheet, BackHandler,
   KeyboardAvoidingView, Platform, StatusBar,
   ScrollView, ActivityIndicator, Keyboard,
 } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import Text from '../../components/Text';
 import TextInput, { type TextInputRef } from '../../components/TextInput';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useRegister } from '../../modules/auth/hooks/useAuth';
 import BannerPicker from '../../modules/store/components/BannerPicker';
-import EmailVerification from '../../modules/auth/components/EmailVerification';
+import PhoneOtpStep from '../../modules/auth/components/PhoneOtpStep';
+import PinSetupStep from '../../modules/auth/components/PinSetupStep';
 import { useKeyboardAwareScroll } from '../../core/keyboard/useKeyboardAwareScroll';
-import { INDIAN_MOBILE_REGEX, isValidEmail } from '../../modules/auth/utils/validation';
+import { isValidMobile, isValidEmail } from '../../modules/auth/utils/validation';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -36,11 +43,19 @@ const DS = {
   text3:       '#9BA3AF',
 };
 
+type Step = 'details' | 'otp' | 'pin';
+const STEP_LABEL: Record<Step, string> = {
+  details: 'Step 1 of 3 · Store details',
+  otp:     'Step 2 of 3 · Verify mobile',
+  pin:     'Step 3 of 3 · Create PIN',
+};
+
 export default function SignupScreen() {
   const insets = useSafeAreaInsets();
-  const { phoneNumber: paramPhone } = useLocalSearchParams<{ phoneNumber: string }>();
-  const { handleRegister, loading, error, errorCode } = useRegister();
+  const { phoneNumber: paramPhone } = useLocalSearchParams<{ phoneNumber?: string }>();
+  const { handleRegister, loading, error, clearError } = useRegister();
 
+  const [step, setStep]                 = useState<Step>('details');
   const [hotelName, setHotelName]       = useState('');
   const [address, setAddress]           = useState('');
   const [email, setEmail]               = useState('');
@@ -52,16 +67,14 @@ export default function SignupScreen() {
   const [bannerUri, setBannerUri]       = useState<string | null>(null);
   const [mobileTouched, setMobileTouched] = useState(!!paramPhone);
   const [emailTouched, setEmailTouched]   = useState(false);
-  // From the email-code check; cleared whenever the email text changes.
-  const [emailToken, setEmailToken]       = useState<string | null>(null);
-
-  // Token expired / rejected server-side (EMAIL_NOT_VERIFIED) → verify again.
-  useEffect(() => {
-    if (errorCode === 'EMAIL_NOT_VERIFIED') setEmailToken(null);
-  }, [errorCode]);
+  // From the phone OTP; cleared whenever the number changes or the backend
+  // says the proof is no longer usable.
+  const [firebaseToken, setFirebaseToken] = useState<string | null>(null);
+  const [verifiedFor, setVerifiedFor]     = useState<string | null>(null);
+  const [otpNotice, setOtpNotice]         = useState<string | null>(null);
 
   // Keyboard-aware scrolling: reserves room under the form while the keyboard is
-  // open and keeps the focused field (incl. the email code box) above it.
+  // open and keeps the focused field above it.
   const kb = useKeyboardAwareScroll();
   const scrollRef = kb.scrollRef;
   const hotelNameRef = useRef<TextInputRef>(null);
@@ -86,13 +99,33 @@ export default function SignupScreen() {
     });
   };
 
+  const goToStep = useCallback((next: Step) => {
+    Keyboard.dismiss();
+    clearError();
+    setStep(next);
+    requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: false }));
+  }, [clearError, scrollRef]);
+
+  // Android back: step back inside the form instead of leaving it.
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (step === 'details') return false;
+        goToStep(step === 'pin' ? 'otp' : 'details');
+        return true;
+      });
+      return () => sub.remove();
+    }, [step, goToStep]),
+  );
+
+  const mobile       = mobileNumber.trim();
   const coordsSet    = latitude.trim().length > 0 && longitude.trim().length > 0;
-  const mobileValid  = INDIAN_MOBILE_REGEX.test(mobileNumber.trim());
-  const showMobileError = mobileTouched && mobileNumber.trim().length > 0 && !mobileValid;
-  const emailValid   = isValidEmail(email);
-  const showEmailError = emailTouched && email.trim().length > 0 && !emailValid;
-  const isFormValid  = !!(hotelName.trim() && address.trim() && emailValid && emailToken && mobileValid && coordsSet);
-  const missingEmailVerification = emailValid && !emailToken;
+  const mobileValid  = isValidMobile(mobile);
+  const showMobileError = mobileTouched && mobile.length > 0 && !mobileValid;
+  const emailFilled  = email.trim().length > 0;
+  const emailValid   = !emailFilled || isValidEmail(email);
+  const showEmailError = emailTouched && emailFilled && !emailValid;
+  const detailsValid = !!(hotelName.trim() && address.trim() && emailValid && mobileValid && coordsSet);
 
   const handleDetectLocation = async () => {
     try {
@@ -113,18 +146,235 @@ export default function SignupScreen() {
     }
   };
 
-  const onSignup = () => {
-    if (!isFormValid || !emailToken) return;
-    handleRegister({
+  const onContinue = () => {
+    if (!detailsValid) return;
+    setOtpNotice(null);
+    // Already verified this exact number (e.g. came back to edit details).
+    goToStep(firebaseToken && verifiedFor === mobile ? 'pin' : 'otp');
+  };
+
+  const onVerified = (token: string) => {
+    setFirebaseToken(token);
+    setVerifiedFor(mobile);
+    goToStep('pin');
+  };
+
+  const onCreatePin = async (pin: string) => {
+    if (!firebaseToken) { goToStep('otp'); return; }
+    const res = await handleRegister({
       hotelName:    hotelName.trim(),
       address:      address.trim(),
-      mobileNumber: mobileNumber.trim(),
-      email:        email.trim(),
+      mobileNumber: mobile,
+      email:        emailFilled ? email.trim() : undefined,
       latitude:     parseFloat(latitude),
       longitude:    parseFloat(longitude),
-      emailVerificationToken: emailToken,
+      firebaseIdToken: firebaseToken,
+      pin,
     }, bannerUri ?? undefined);
+    if (!res.ok && res.otpProblem) {
+      // OTP proof expired (e.g. the app sat on this step for a long time).
+      setFirebaseToken(null);
+      setVerifiedFor(null);
+      setOtpNotice('Please verify your mobile number again to finish.');
+      goToStep('otp');
+    }
   };
+
+  const renderDetails = () => (
+    <>
+      <Text style={styles.formTitle}>Create your account</Text>
+      <Text style={styles.formSubtitle}>Set up your store on Strike</Text>
+
+      {/* ── BUSINESS INFO ── */}
+      <Text style={styles.sectionLabel}>BUSINESS INFO</Text>
+
+      <View style={{ marginBottom: 16 }}>
+        <BannerPicker
+          uri={bannerUri}
+          onPick={setBannerUri}
+          onRemove={() => setBannerUri(null)}
+          label="Store Banner (optional)"
+        />
+      </View>
+
+      <Text style={styles.inputLabel}>Business Name *</Text>
+      <TextInput
+        ref={hotelNameRef}
+        style={styles.input}
+        placeholder="e.g. Spice Garden"
+        placeholderTextColor={DS.text3}
+        value={hotelName}
+        onChangeText={setHotelName}
+        autoCapitalize="words"
+        onFocus={() => scrollToInput(hotelNameRef)}
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => addressRef.current?.focus()}
+      />
+
+      <Text style={styles.inputLabel}>Address *</Text>
+      <TextInput
+        ref={addressRef}
+        style={[styles.input, styles.inputMultiline]}
+        placeholder="e.g. 123 Main Street, Hyderabad"
+        placeholderTextColor={DS.text3}
+        value={address}
+        onChangeText={setAddress}
+        multiline
+        numberOfLines={3}
+        textAlignVertical="top"
+        onFocus={() => scrollToInput(addressRef)}
+      />
+
+      {/* ── CONTACT ── */}
+      <Text style={styles.sectionLabel}>CONTACT</Text>
+
+      <Text style={styles.inputLabel}>Mobile Number *</Text>
+      <View style={[styles.phoneRow, showMobileError && styles.phoneRowError]}>
+        <View style={styles.countryChip}>
+          <Text style={styles.countryText}>+91</Text>
+        </View>
+        <View style={styles.phoneDivider} />
+        <TextInput
+          ref={mobileRef}
+          style={styles.phoneInput}
+          placeholder="98765 43210"
+          placeholderTextColor={DS.text3}
+          value={mobileNumber}
+          onChangeText={(text) => setMobileNumber(text.replace(/[^0-9]/g, ''))}
+          keyboardType="phone-pad"
+          maxLength={10}
+          onFocus={() => scrollToInput(mobileRef)}
+          onBlur={() => setMobileTouched(true)}
+          returnKeyType="next"
+          submitBehavior="submit"
+          onSubmitEditing={() => emailRef.current?.focus()}
+        />
+      </View>
+      {showMobileError ? (
+        <View style={styles.errorRow}>
+          <Ionicons name="alert-circle-outline" size={14} color={DS.primary} />
+          <Text style={styles.errorText}>
+            Enter a valid 10-digit mobile number starting with 6-9.
+          </Text>
+        </View>
+      ) : (
+        <Text style={styles.fieldHint}>
+          We'll send an OTP to this number. You'll sign in with it and a 4-digit PIN.
+        </Text>
+      )}
+
+      <Text style={styles.inputLabel}>Email (optional)</Text>
+      <TextInput
+        ref={emailRef}
+        style={[styles.input, showEmailError && styles.inputInvalid]}
+        placeholder="store@example.com"
+        placeholderTextColor={DS.text3}
+        value={email}
+        onChangeText={setEmail}
+        onBlur={() => setEmailTouched(true)}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="email"
+        maxLength={254}
+        onFocus={() => scrollToInput(emailRef)}
+        returnKeyType="done"
+        onSubmitEditing={() => Keyboard.dismiss()}
+      />
+      {showEmailError && (
+        <View style={styles.errorRow}>
+          <Ionicons name="alert-circle-outline" size={14} color={DS.primary} />
+          <Text style={styles.errorText}>Enter a valid email address, or leave it empty.</Text>
+        </View>
+      )}
+
+      {/* ── LOCATION ── */}
+      <Text style={styles.sectionLabel}>LOCATION</Text>
+
+      <TouchableOpacity
+        style={styles.detectBtn}
+        onPress={handleDetectLocation}
+        disabled={locLoading}
+        activeOpacity={0.85}
+      >
+        {locLoading ? (
+          <ActivityIndicator size="small" color={DS.primary} />
+        ) : (
+          <Ionicons name="location-outline" size={18} color={DS.primary} />
+        )}
+        <Text style={styles.detectBtnText}>
+          {locLoading ? 'Detecting…' : coordsSet ? 'Re-detect Location' : 'Auto Detect Location'}
+        </Text>
+      </TouchableOpacity>
+
+      {coordsSet && !locError && (
+        <View style={styles.locationSuccess}>
+          <Ionicons name="checkmark-circle" size={14} color={DS.success} />
+          <Text style={styles.locationSuccessText}>{latitude}, {longitude}</Text>
+        </View>
+      )}
+
+      {!!locError && (
+        <View style={styles.errorRow}>
+          <Ionicons name="alert-circle-outline" size={14} color={DS.primary} />
+          <Text style={styles.errorText}>{locError}</Text>
+        </View>
+      )}
+
+      <Text style={styles.manualLabel}>Or enter coordinates manually:</Text>
+      <View style={styles.coordRow}>
+        <View style={styles.coordField}>
+          <Text style={styles.inputLabel}>Latitude</Text>
+          <TextInput
+            ref={latitudeRef}
+            style={styles.input}
+            placeholder="17.3850"
+            placeholderTextColor={DS.text3}
+            value={latitude}
+            onChangeText={setLatitude}
+            keyboardType="decimal-pad"
+            onFocus={() => scrollToInput(latitudeRef)}
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => longitudeRef.current?.focus()}
+          />
+        </View>
+        <View style={styles.coordField}>
+          <Text style={styles.inputLabel}>Longitude</Text>
+          <TextInput
+            ref={longitudeRef}
+            style={styles.input}
+            placeholder="78.4867"
+            placeholderTextColor={DS.text3}
+            value={longitude}
+            onChangeText={setLongitude}
+            keyboardType="decimal-pad"
+            onFocus={() => scrollToInput(longitudeRef)}
+            returnKeyType="done"
+            onSubmitEditing={() => Keyboard.dismiss()}
+          />
+        </View>
+      </View>
+
+      <TouchableOpacity
+        style={[styles.primaryBtn, !detailsValid && styles.primaryBtnDisabled]}
+        onPress={onContinue}
+        disabled={!detailsValid}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.primaryBtnText}>Continue</Text>
+        <Ionicons name="arrow-forward" size={18} color="#fff" />
+      </TouchableOpacity>
+
+      <Text style={styles.termsText}>
+        By signing up you agree to our{' '}
+        <Text style={styles.termsLink} onPress={() => router.push('/terms')}>Terms & Conditions</Text>
+        {' and '}
+        <Text style={styles.termsLink} onPress={() => router.push('/privacy-policy')}>Privacy Policy</Text>
+      </Text>
+    </>
+  );
 
   return (
     <KeyboardAvoidingView
@@ -135,15 +385,25 @@ export default function SignupScreen() {
 
       {/* Brand Zone */}
       <View style={styles.brandZone}>
-     <View style={[styles.brandContent, { paddingTop: insets.top + 24 }]}>
-      <View style={styles.logoMark}>
-     <Text style={styles.logoMarkText}>S</Text>
-     </View>
-
-    <Text style={styles.wordmark}>STRIKE</Text>
-    <Text style={styles.tagline}>Register your business</Text>
-  </View>
-</View>
+        <View style={[styles.brandContent, { paddingTop: insets.top + 24 }]}>
+          {step !== 'details' && (
+            <TouchableOpacity
+              style={[styles.backBtn, { top: insets.top + 18 }]}
+              onPress={() => goToStep(step === 'pin' ? 'otp' : 'details')}
+              disabled={loading}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityLabel="Back"
+            >
+              <Ionicons name="arrow-back" size={22} color="#fff" />
+            </TouchableOpacity>
+          )}
+          <View style={styles.logoMark}>
+            <Text style={styles.logoMarkText}>S</Text>
+          </View>
+          <Text style={styles.wordmark}>STRIKE</Text>
+          <Text style={styles.tagline}>{STEP_LABEL[step]}</Text>
+        </View>
+      </View>
 
       {/* Form Zone */}
       <ScrollView
@@ -155,221 +415,35 @@ export default function SignupScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.formTitle}>Create your account</Text>
-        <Text style={styles.formSubtitle}>Set up your store on Strike</Text>
+        {step === 'details' && renderDetails()}
 
-        {/* ── BUSINESS INFO ── */}
-        <Text style={styles.sectionLabel}>BUSINESS INFO</Text>
-
-        <View style={{ marginBottom: 16 }}>
-          <BannerPicker
-            uri={bannerUri}
-            onPick={setBannerUri}
-            onRemove={() => setBannerUri(null)}
-            label="Store Banner (optional)"
-          />
-        </View>
-
-        <Text style={styles.inputLabel}>Business Name *</Text>
-        <TextInput
-          ref={hotelNameRef}
-          style={styles.input}
-          placeholder="e.g. Spice Garden"
-          placeholderTextColor={DS.text3}
-          value={hotelName}
-          onChangeText={setHotelName}
-          autoCapitalize="words"
-          onFocus={() => scrollToInput(hotelNameRef)}
-          returnKeyType="next"
-          submitBehavior="submit"
-          onSubmitEditing={() => addressRef.current?.focus()}
-        />
-
-        <Text style={styles.inputLabel}>Address *</Text>
-        <TextInput
-          ref={addressRef}
-          style={[styles.input, styles.inputMultiline]}
-          placeholder="e.g. 123 Main Street, Hyderabad"
-          placeholderTextColor={DS.text3}
-          value={address}
-          onChangeText={setAddress}
-          multiline
-          numberOfLines={3}
-          textAlignVertical="top"
-          onFocus={() => scrollToInput(addressRef)}
-        />
-
-        {/* ── CONTACT ── */}
-        <Text style={styles.sectionLabel}>CONTACT</Text>
-
-        <Text style={styles.inputLabel}>Email *</Text>
-        <TextInput
-          ref={emailRef}
-          style={[styles.input, showEmailError && styles.inputInvalid]}
-          placeholder="store@example.com"
-          placeholderTextColor={DS.text3}
-          value={email}
-          onChangeText={text => { setEmail(text); setEmailToken(null); }}
-          onBlur={() => setEmailTouched(true)}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="email"
-          maxLength={254}
-          onFocus={() => scrollToInput(emailRef)}
-          returnKeyType="next"
-          submitBehavior="submit"
-          onSubmitEditing={() => mobileRef.current?.focus()}
-        />
-        {showEmailError ? (
-          <View style={styles.errorRow}>
-            <Ionicons name="alert-circle-outline" size={14} color={DS.primary} />
-            <Text style={styles.errorText}>Enter a valid email address.</Text>
-          </View>
-        ) : (
-          <Text style={styles.fieldHint}>
-            You'll sign in with this email. Your password is sent here once your store is approved.
-          </Text>
-        )}
-        <EmailVerification
-          email={email}
-          emailValid={emailValid}
-          verified={!!emailToken}
-          onVerified={setEmailToken}
-        />
-
-        <Text style={styles.inputLabel}>Mobile Number *</Text>
-        <View style={[styles.phoneRow, showMobileError && styles.phoneRowError]}>
-          <View style={styles.countryChip}>
-            <Text style={styles.countryText}>+91</Text>
-          </View>
-          <View style={styles.phoneDivider} />
-          <TextInput
-            ref={mobileRef}
-            style={styles.phoneInput}
-            placeholder="98765 43210"
-            placeholderTextColor={DS.text3}
-            value={mobileNumber}
-            onChangeText={(text) => setMobileNumber(text.replace(/[^0-9]/g, ''))}
-            keyboardType="phone-pad"
-            maxLength={10}
-            editable={!paramPhone}
-            onFocus={() => scrollToInput(mobileRef)}
-            onBlur={() => setMobileTouched(true)}
-            returnKeyType="done"
-            onSubmitEditing={() => Keyboard.dismiss()}
-          />
-        </View>
-        {showMobileError && (
-          <View style={styles.errorRow}>
-            <Ionicons name="alert-circle-outline" size={14} color={DS.primary} />
-            <Text style={styles.errorText}>
-              Enter a valid 10-digit mobile number starting with 6-9.
-            </Text>
-          </View>
-        )}
-
-        {/* ── LOCATION ── */}
-        <Text style={styles.sectionLabel}>LOCATION</Text>
-
-        <TouchableOpacity
-          style={styles.detectBtn}
-          onPress={handleDetectLocation}
-          disabled={locLoading}
-          activeOpacity={0.85}
-        >
-          {locLoading ? (
-            <ActivityIndicator size="small" color={DS.primary} />
-          ) : (
-            <Ionicons name="location-outline" size={18} color={DS.primary} />
-          )}
-          <Text style={styles.detectBtnText}>
-            {locLoading ? 'Detecting…' : coordsSet ? 'Re-detect Location' : 'Auto Detect Location'}
-          </Text>
-        </TouchableOpacity>
-
-        {coordsSet && !locError && (
-          <View style={styles.locationSuccess}>
-            <Ionicons name="checkmark-circle" size={14} color={DS.success} />
-            <Text style={styles.locationSuccessText}>{latitude}, {longitude}</Text>
-          </View>
-        )}
-
-        {!!locError && (
-          <View style={styles.errorRow}>
-            <Ionicons name="alert-circle-outline" size={14} color={DS.primary} />
-            <Text style={styles.errorText}>{locError}</Text>
-          </View>
-        )}
-
-        <Text style={styles.manualLabel}>Or enter coordinates manually:</Text>
-        <View style={styles.coordRow}>
-          <View style={styles.coordField}>
-            <Text style={styles.inputLabel}>Latitude</Text>
-            <TextInput
-              ref={latitudeRef}
-              style={styles.input}
-              placeholder="17.3850"
-              placeholderTextColor={DS.text3}
-              value={latitude}
-              onChangeText={setLatitude}
-              keyboardType="decimal-pad"
-              onFocus={() => scrollToInput(latitudeRef)}
-              returnKeyType="next"
-              submitBehavior="submit"
-              onSubmitEditing={() => longitudeRef.current?.focus()}
+        {step === 'otp' && (
+          <>
+            {!!otpNotice && (
+              <View style={styles.noticeRow}>
+                <Ionicons name="information-circle-outline" size={16} color={DS.warning} />
+                <Text style={styles.noticeText}>{otpNotice}</Text>
+              </View>
+            )}
+            <PhoneOtpStep
+              mobileNumber={mobile}
+              onVerified={onVerified}
+              onChangeNumber={() => goToStep('details')}
+              onFocusCode={() => kb.ensureVisible(140)}
             />
-          </View>
-          <View style={styles.coordField}>
-            <Text style={styles.inputLabel}>Longitude</Text>
-            <TextInput
-              ref={longitudeRef}
-              style={styles.input}
-              placeholder="78.4867"
-              placeholderTextColor={DS.text3}
-              value={longitude}
-              onChangeText={setLongitude}
-              keyboardType="decimal-pad"
-              onFocus={() => scrollToInput(longitudeRef)}
-              returnKeyType="done"
-              onSubmitEditing={() => Keyboard.dismiss()}
-            />
-          </View>
-        </View>
-
-        {!!error && (
-          <View style={styles.errorRow}>
-            <Ionicons name="alert-circle-outline" size={14} color={DS.primary} />
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
+          </>
         )}
 
-        {missingEmailVerification && !error && (
-          <Text style={styles.submitHint}>Verify your email above to continue.</Text>
+        {step === 'pin' && (
+          <PinSetupStep
+            submitLabel="Register Store"
+            loading={loading}
+            error={error}
+            onSubmit={onCreatePin}
+            onFocusField={(extra) => kb.ensureVisible(extra)}
+          />
         )}
 
-        <TouchableOpacity
-          style={[styles.primaryBtn, (!isFormValid || loading) && styles.primaryBtnDisabled]}
-          onPress={onSignup}
-          disabled={!isFormValid || loading}
-          activeOpacity={0.85}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <>
-              <Ionicons name="storefront-outline" size={18} color="#fff" />
-              <Text style={styles.primaryBtnText}>Register Store</Text>
-            </>
-          )}
-        </TouchableOpacity>
-
-        <Text style={styles.termsText}>
-          By signing up you agree to our{' '}
-          <Text style={styles.termsLink} onPress={() => router.push('/terms')}>Terms & Conditions</Text>
-          {' and '}
-          <Text style={styles.termsLink} onPress={() => router.push('/privacy-policy')}>Privacy Policy</Text>
-        </Text>
         <View style={{ height: kb.keyboardSpace }} />
       </ScrollView>
     </KeyboardAvoidingView>
@@ -382,6 +456,7 @@ const styles = StyleSheet.create({
   // Brand Zone
   brandZone:    { backgroundColor: DS.primary, paddingBottom: 20 },
   brandContent: { alignItems: 'center', paddingBottom: 4 },
+  backBtn:      { position: 'absolute', left: 20, width: 36, height: 36, justifyContent: 'center' },
   logoMark: {
     width: 48, height: 48, borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.15)',
@@ -390,7 +465,7 @@ const styles = StyleSheet.create({
   },
   logoMarkText: { fontSize: 24, fontWeight: '900', color: '#fff' },
   wordmark:     { fontSize: 22, fontWeight: '900', color: '#fff', letterSpacing: 5, marginBottom: 6 },
-  tagline:      { fontSize: 13, color: 'rgba(255,255,255,0.7)' },
+  tagline:      { fontSize: 13, color: 'rgba(255,255,255,0.8)' },
 
   // Form Zone
   formZone:    { flex: 1, backgroundColor: DS.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28 },
@@ -415,7 +490,6 @@ const styles = StyleSheet.create({
   inputMultiline: { height: 84, paddingTop: 12, textAlignVertical: 'top' },
   inputInvalid:   { borderColor: DS.primary },
   fieldHint:      { fontSize: 12, color: DS.text3, marginTop: -10, marginBottom: 16, lineHeight: 17 },
-  submitHint:     { fontSize: 12, color: DS.text2, textAlign: 'center', marginBottom: 4 },
 
   // Phone
   phoneRow: {
@@ -442,9 +516,14 @@ const styles = StyleSheet.create({
   coordRow:            { flexDirection: 'row', gap: 12 },
   coordField:          { flex: 1 },
 
-  // Error
+  // Error / notice
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
   errorText: { fontSize: 13, color: DS.primary, flex: 1 },
+  noticeRow: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    backgroundColor: DS.warningSoft, borderRadius: 10, padding: 10, marginBottom: 16,
+  },
+  noticeText: { flex: 1, fontSize: 13, color: DS.text2, lineHeight: 18 },
 
   // Buttons
   primaryBtn: {

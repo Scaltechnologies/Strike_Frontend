@@ -11,6 +11,7 @@ const KEYS = {
   PENDING_BANNER: 'pending_store_banner',
   MUST_CHANGE_PASSWORD: 'must_change_password',
   SIGNIN_EMAIL: 'signin_email',
+  LAST_MOBILE: 'last_signin_mobile',
 } as const;
 
 // expo-secure-store has no web implementation — calling it there throws
@@ -97,36 +98,25 @@ export const clearPendingBanner = async (): Promise<void> => {
   await deleteItem(KEYS.PENDING_BANNER);
 };
 
-// ── Clear All (Logout) ────────────────────────────
-
-// ── Forced password change ──────────────────────
+// ── Last signed-in mobile number ─────────────────
 //
-// Set while the vendor is signed in on a system-generated password (from the
-// approval / forgot-password email). Persisted so that killing and reopening
-// the app still lands on the change-password screen instead of Home.
+// Pre-fills the sign-in screen so the vendor only has to enter their PIN.
+// Deliberately kept on logout (same device, same vendor in practice).
 
-export const setMustChangePassword = async (value: boolean): Promise<void> => {
-  if (value) await setItem(KEYS.MUST_CHANGE_PASSWORD, '1');
-  else await deleteItem(KEYS.MUST_CHANGE_PASSWORD);
+export const saveLastMobile = async (mobile: string): Promise<void> => {
+  await setItem(KEYS.LAST_MOBILE, mobile);
 };
 
-export const getMustChangePassword = async (): Promise<boolean> => {
-  return (await getItem(KEYS.MUST_CHANGE_PASSWORD)) === '1';
+export const getLastMobile = async (): Promise<string | null> => {
+  return await getItem(KEYS.LAST_MOBILE);
 };
 
-// ── Sign-in email (shown on Profile / Change Sign-in Email) ──────
-
-export const saveSignInEmail = async (email: string): Promise<void> => {
-  await setItem(KEYS.SIGNIN_EMAIL, email);
-};
-
-export const getSignInEmail = async (): Promise<string | null> => {
-  return await getItem(KEYS.SIGNIN_EMAIL);
-};
+// ── Clear All (Logout) ────────────────────────────
 
 export const clearAll = async (): Promise<void> => {
   await clearTokens();
   await clearUser();
-  await setMustChangePassword(false);
+  // Leftovers from the email/password sign-in era.
+  await deleteItem(KEYS.MUST_CHANGE_PASSWORD);
   await deleteItem(KEYS.SIGNIN_EMAIL);
 };

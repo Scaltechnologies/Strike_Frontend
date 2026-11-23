@@ -6,22 +6,13 @@ const endpoints = {
   // ── Authentication ─────────────────────────────────────────────────
   auth: {
     vendor: {
-      // Submits a registration for admin review (no password, no OTP).
-      register:       '/api/auth/vendor/register',
-      // Email + password sign-in.
-      signIn:         '/api/auth/vendor/signin',
-      // Emails a new generated password (same response whether or not the email exists).
-      forgotPassword: '/api/auth/vendor/forgot-password',
+      // Mobile number + 4-digit PIN. The number is proven with a Firebase
+      // phone OTP (ID token) at registration and for "Forgot PIN".
+      phoneRegister: '/api/auth/vendor/phone/register',
+      pinSignIn:     '/api/auth/vendor/pin/signin',
+      pinReset:      '/api/auth/vendor/pin/reset',
       // Bearer token required — returns fresh tokens.
-      changePassword: '/api/auth/vendor/change-password',
-      // Registration email verification: send a 6-digit code, then verify it
-      // for an emailVerificationToken that /register requires.
-      emailOtpSend:   '/api/auth/vendor/email-otp/send',
-      emailOtpVerify: '/api/auth/vendor/email-otp/verify',
-      // Change sign-in email (bearer token): password + new email → code to
-      // the new address → confirm (returns fresh tokens).
-      changeEmailRequest: '/api/auth/vendor/change-email/request',
-      changeEmailConfirm: '/api/auth/vendor/change-email/confirm',
+      pinChange:     '/api/auth/vendor/pin/change',
       // Multipart, unauthenticated (called before /register) — uploads a store
       // banner picked on the signup screen and returns a URL to include as
       // RegisterVendorRequest.logoUrl. See registerLogoUpload() in authService.ts.

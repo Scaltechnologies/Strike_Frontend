@@ -133,7 +133,7 @@ export const TERMS: LegalDocument = {
         {
           bullets: [
             'Provide accurate and complete information and keep it updated.',
-            'Protect your login credentials, including your password, and do not share them with anyone.',
+            'Protect your login credentials, including your PIN and any OTP, and do not share them with anyone.',
             'Not share your account with unauthorised persons.',
             'Notify STRIKE through the published support channel if you suspect unauthorised access.',
             'Take reasonable care with activity carried out through your account, subject to applicable law and STRIKE’s own security obligations.',
@@ -489,7 +489,7 @@ export const PRIVACY_POLICY: LegalDocument = {
             '**Notification token:** if you allow notifications, a Firebase Cloud Messaging device token, together with your device platform, device name and app version, so that we can send you alerts about activity at your store.',
           ],
         },
-        'You sign in with your email address and a password. Your password is stored on our servers only as a secure one-way hash and is never visible to our staff; we email you a temporary password when your account is approved or when you request a reset, and ask you to replace it with your own. After you sign in, your session tokens are stored in encrypted storage on your device and are removed when you sign out. The STRIKE Vendor app does not use your microphone.',
+        'You sign in with your mobile number and a 4-digit PIN that you choose. We confirm your mobile number with a one-time password (OTP) sent by SMS through Google Firebase Authentication when you register or reset your PIN. Your PIN is stored on our servers only as a secure one-way hash and is never visible to our staff. After you sign in, your session tokens are stored in encrypted storage on your device and are removed when you sign out. The STRIKE Vendor app does not use your microphone.',
       ],
     },
     {
@@ -560,7 +560,7 @@ export const PRIVACY_POLICY: LegalDocument = {
           ],
         },
         'Such providers may process relevant information on our behalf to provide the services for which they have been engaged, subject to applicable contractual and legal safeguards.',
-        'In the STRIKE Vendor app, these providers include Firebase Cloud Messaging, for push notifications, and our email delivery provider, for sending account approval and password emails.',
+        'In the STRIKE Vendor app, these providers include Firebase Authentication, for verifying your mobile number by SMS OTP, and Firebase Cloud Messaging, for push notifications.',
         { subheading: '6.4 Legal and Regulatory Authorities' },
         'We may disclose information where reasonably necessary to:',
         {

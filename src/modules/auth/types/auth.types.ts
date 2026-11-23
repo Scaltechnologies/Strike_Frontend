@@ -7,56 +7,53 @@ export interface AuthTokens {
 
 export type VendorStatus = 'PENDING' | 'VERIFIED' | 'ACTIVE' | 'SUSPENDED' | 'REJECTED';
 
-// Backend: POST /api/auth/vendor/signin and /change-password response
+// Backend: /pin/signin, /pin/reset, /pin/change response. token/refreshToken
+// are absent when /pin/reset is used by a vendor still awaiting approval.
 export interface VendorAuthResponse {
-  token: string;
-  refreshToken: string;
-  expiresIn: number;
+  token?: string;
+  refreshToken?: string;
+  expiresIn?: number;
   vendorId: number;
-  hotelName: string;
-  mobileNumber: string;
-  email: string;
-  address: string;
+  hotelName?: string;
+  mobileNumber?: string;
+  email?: string;
+  address?: string;
   status: VendorStatus;
   message?: string;
-  // True while the vendor is on a system-generated password (from the
-  // approval or forgot-password email) — the app must make them set their own.
-  mustChangePassword?: boolean;
 }
 
-// Backend: POST /api/auth/vendor/signin body
-export interface SignInRequest {
-  email: string;
-  password: string;
+// Backend: POST /api/auth/vendor/pin/signin body
+export interface PinSignInRequest {
+  mobileNumber: string;
+  pin: string;
 }
 
-// Backend: POST /api/auth/vendor/change-password body (bearer token required)
-export interface ChangePasswordRequest {
-  currentPassword: string;
-  newPassword: string;
+// Backend: POST /api/auth/vendor/pin/change body (bearer token required)
+export interface ChangePinRequest {
+  currentPin: string;
+  newPin: string;
 }
 
-// Backend: POST /api/auth/vendor/register body. No password: the vendor
-// receives a generated one by email once an admin approves the store.
-export interface RegisterVendorRequest {
+// Backend: POST /api/auth/vendor/pin/reset body ("Forgot PIN")
+export interface ResetPinRequest {
+  firebaseIdToken: string;
+  newPin: string;
+}
+
+// Backend: POST /api/auth/vendor/phone/register body. The mobile number is
+// proven by firebaseIdToken (Firebase phone OTP) and must match mobileNumber.
+export interface PhoneRegisterRequest {
   hotelName: string;
   address: string;
   mobileNumber: string;
-  email: string;
+  // Optional contact email — not used for sign-in.
+  email?: string;
   latitude: number;
   longitude: number;
-  // Returned by POST /api/auth/vendor/register/upload-logo (see
-  // authService.registerLogoUpload) when a banner was picked on the signup
-  // screen and the immediate upload succeeded. Left undefined otherwise —
-  // useRegister() then falls back to the deferred pending-banner upload on
-  // the vendor's first sign-in instead.
+  // From POST /api/auth/vendor/register/upload-logo when a banner was picked
+  // and the immediate upload succeeded; otherwise the banner is uploaded on
+  // first sign-in (see useRegister).
   logoUrl?: string;
-  // From POST /api/auth/vendor/email-otp/verify — proves the vendor owns `email`.
-  emailVerificationToken: string;
-}
-
-// Backend: /email-otp/send and /change-email/request responses
-export interface CodeSentResponse {
-  message: string;
-  resendAfterSeconds: number;
+  firebaseIdToken: string;
+  pin: string;
 }
