@@ -1,8 +1,7 @@
 // src/core/firebase/firebaseMessaging.ts
 //
-// Thin wrapper around @react-native-firebase/messaging's modular API. Alongside
-// firebaseAuth.ts, this is the only other place in the app that talks to Firebase
-// directly — callers (pushRegistration.ts, NotificationListener.tsx, index.ts) own
+// Thin wrapper around @react-native-firebase/messaging's modular API. This is the
+// only place in the app that talks to Firebase directly — callers (pushRegistration.ts, NotificationListener.tsx, index.ts) own
 // what to *do* with a token/message; this module only exposes the raw primitives.
 //
 // Native module — requires an EAS development build. Does NOT work in Expo Go, and

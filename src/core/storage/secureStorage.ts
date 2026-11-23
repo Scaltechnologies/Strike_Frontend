@@ -9,6 +9,8 @@ const KEYS = {
   REFRESH_TOKEN: 'refresh_token',
   USER: 'auth_user',
   PENDING_BANNER: 'pending_store_banner',
+  MUST_CHANGE_PASSWORD: 'must_change_password',
+  SIGNIN_EMAIL: 'signin_email',
 } as const;
 
 // expo-secure-store has no web implementation — calling it there throws
@@ -97,7 +99,34 @@ export const clearPendingBanner = async (): Promise<void> => {
 
 // ── Clear All (Logout) ────────────────────────────
 
+// ── Forced password change ──────────────────────
+//
+// Set while the vendor is signed in on a system-generated password (from the
+// approval / forgot-password email). Persisted so that killing and reopening
+// the app still lands on the change-password screen instead of Home.
+
+export const setMustChangePassword = async (value: boolean): Promise<void> => {
+  if (value) await setItem(KEYS.MUST_CHANGE_PASSWORD, '1');
+  else await deleteItem(KEYS.MUST_CHANGE_PASSWORD);
+};
+
+export const getMustChangePassword = async (): Promise<boolean> => {
+  return (await getItem(KEYS.MUST_CHANGE_PASSWORD)) === '1';
+};
+
+// ── Sign-in email (shown on Profile / Change Sign-in Email) ──────
+
+export const saveSignInEmail = async (email: string): Promise<void> => {
+  await setItem(KEYS.SIGNIN_EMAIL, email);
+};
+
+export const getSignInEmail = async (): Promise<string | null> => {
+  return await getItem(KEYS.SIGNIN_EMAIL);
+};
+
 export const clearAll = async (): Promise<void> => {
   await clearTokens();
   await clearUser();
+  await setMustChangePassword(false);
+  await deleteItem(KEYS.SIGNIN_EMAIL);
 };

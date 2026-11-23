@@ -6,13 +6,14 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import Text from '../../components/Text';
 import TextInput, { type TextInputRef } from '../../components/TextInput';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useRegister } from '../../modules/auth/hooks/useAuth';
 import BannerPicker from '../../modules/store/components/BannerPicker';
-import { INDIAN_MOBILE_REGEX } from '../../core/firebase/firebaseAuth';
+import EmailVerification from '../../modules/auth/components/EmailVerification';
+import { INDIAN_MOBILE_REGEX, isValidEmail } from '../../modules/auth/utils/validation';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -37,7 +38,7 @@ const DS = {
 export default function SignupScreen() {
   const insets = useSafeAreaInsets();
   const { phoneNumber: paramPhone } = useLocalSearchParams<{ phoneNumber: string }>();
-  const { handleRegister, loading, error } = useRegister();
+  const { handleRegister, loading, error, errorCode } = useRegister();
 
   const [hotelName, setHotelName]       = useState('');
   const [address, setAddress]           = useState('');
@@ -49,6 +50,14 @@ export default function SignupScreen() {
   const [locError, setLocError]         = useState<string | null>(null);
   const [bannerUri, setBannerUri]       = useState<string | null>(null);
   const [mobileTouched, setMobileTouched] = useState(!!paramPhone);
+  const [emailTouched, setEmailTouched]   = useState(false);
+  // From the email-code check; cleared whenever the email text changes.
+  const [emailToken, setEmailToken]       = useState<string | null>(null);
+
+  // Token expired / rejected server-side (EMAIL_NOT_VERIFIED) → verify again.
+  useEffect(() => {
+    if (errorCode === 'EMAIL_NOT_VERIFIED') setEmailToken(null);
+  }, [errorCode]);
 
   const scrollRef    = useRef<ScrollView>(null);
   const hotelNameRef = useRef<TextInputRef>(null);
@@ -76,7 +85,10 @@ export default function SignupScreen() {
   const coordsSet    = latitude.trim().length > 0 && longitude.trim().length > 0;
   const mobileValid  = INDIAN_MOBILE_REGEX.test(mobileNumber.trim());
   const showMobileError = mobileTouched && mobileNumber.trim().length > 0 && !mobileValid;
-  const isFormValid  = !!(hotelName.trim() && address.trim() && email.trim() && mobileValid && coordsSet);
+  const emailValid   = isValidEmail(email);
+  const showEmailError = emailTouched && email.trim().length > 0 && !emailValid;
+  const isFormValid  = !!(hotelName.trim() && address.trim() && emailValid && emailToken && mobileValid && coordsSet);
+  const missingEmailVerification = emailValid && !emailToken;
 
   const handleDetectLocation = async () => {
     try {
@@ -98,7 +110,7 @@ export default function SignupScreen() {
   };
 
   const onSignup = () => {
-    if (!isFormValid) return;
+    if (!isFormValid || !emailToken) return;
     handleRegister({
       hotelName:    hotelName.trim(),
       address:      address.trim(),
@@ -106,6 +118,7 @@ export default function SignupScreen() {
       email:        email.trim(),
       latitude:     parseFloat(latitude),
       longitude:    parseFloat(longitude),
+      emailVerificationToken: emailToken,
     }, bannerUri ?? undefined);
   };
 
@@ -183,20 +196,40 @@ export default function SignupScreen() {
         {/* ── CONTACT ── */}
         <Text style={styles.sectionLabel}>CONTACT</Text>
 
-        <Text style={styles.inputLabel}>Email</Text>
+        <Text style={styles.inputLabel}>Email *</Text>
         <TextInput
           ref={emailRef}
-          style={styles.input}
+          style={[styles.input, showEmailError && styles.inputInvalid]}
           placeholder="store@example.com"
           placeholderTextColor={DS.text3}
           value={email}
-          onChangeText={setEmail}
+          onChangeText={text => { setEmail(text); setEmailToken(null); }}
+          onBlur={() => setEmailTouched(true)}
           keyboardType="email-address"
           autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
+          maxLength={254}
           onFocus={() => scrollToInput(emailRef)}
           returnKeyType="next"
           submitBehavior="submit"
           onSubmitEditing={() => mobileRef.current?.focus()}
+        />
+        {showEmailError ? (
+          <View style={styles.errorRow}>
+            <Ionicons name="alert-circle-outline" size={14} color={DS.primary} />
+            <Text style={styles.errorText}>Enter a valid email address.</Text>
+          </View>
+        ) : (
+          <Text style={styles.fieldHint}>
+            You'll sign in with this email. Your password is sent here once your store is approved.
+          </Text>
+        )}
+        <EmailVerification
+          email={email}
+          emailValid={emailValid}
+          verified={!!emailToken}
+          onVerified={setEmailToken}
         />
 
         <Text style={styles.inputLabel}>Mobile Number *</Text>
@@ -305,6 +338,10 @@ export default function SignupScreen() {
           </View>
         )}
 
+        {missingEmailVerification && !error && (
+          <Text style={styles.submitHint}>Verify your email above to continue.</Text>
+        )}
+
         <TouchableOpacity
           style={[styles.primaryBtn, (!isFormValid || loading) && styles.primaryBtnDisabled]}
           onPress={onSignup}
@@ -369,6 +406,9 @@ const styles = StyleSheet.create({
     fontSize: 15, color: DS.text, marginBottom: 16,
   },
   inputMultiline: { height: 84, paddingTop: 12, textAlignVertical: 'top' },
+  inputInvalid:   { borderColor: DS.primary },
+  fieldHint:      { fontSize: 12, color: DS.text3, marginTop: -10, marginBottom: 16, lineHeight: 17 },
+  submitHint:     { fontSize: 12, color: DS.text2, textAlign: 'center', marginBottom: 4 },
 
   // Phone
   phoneRow: {
