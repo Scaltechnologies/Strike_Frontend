@@ -56,4 +56,10 @@ export interface PhoneRegisterRequest {
   logoUrl?: string;
   firebaseIdToken: string;
   pin: string;
+  // Optional — this phone's FCM token, so the "approved" push reaches the vendor
+  // before they can sign in (see getPushInfoForRegistration).
+  pushToken?: string;
+  pushPlatform?: 'ANDROID' | 'IOS';
+  deviceName?: string;
+  appVersion?: string;
 }

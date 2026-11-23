@@ -8,6 +8,7 @@
 // session is always the backend JWT pair.
 
 import { useState } from 'react';
+import { Keyboard } from 'react-native';
 import { router } from 'expo-router';
 import {
   registerWithPhone,
@@ -29,7 +30,7 @@ import { uploadStoreBanner } from '../../store/services/storeService';
 import { getUserMessage } from '../../../core/api/errorMessage';
 import { normalizeEmail } from '../utils/validation';
 import { signOutFirebase } from '../../../core/firebase/firebaseAuth';
-import { deregisterCurrentPushToken } from '../../notifications/push/pushRegistration';
+import { deregisterCurrentPushToken, getPushInfoForRegistration } from '../../notifications/push/pushRegistration';
 import { resetNotificationStore } from '../../notifications/store/notificationStore';
 
 type ApiError = Error & { status?: number; code?: string };
@@ -75,6 +76,10 @@ async function completeSignIn(response: VendorAuthResponse): Promise<void> {
     await clearPendingBanner();
   }
 
+  // Navigating while the keyboard is still open (the PIN boxes auto-submit) can
+  // leave a blank screen on Android — close it and let it settle first.
+  Keyboard.dismiss();
+  await new Promise(r => setTimeout(r, 150));
   router.replace('/(main)/home');
 }
 
@@ -206,8 +211,12 @@ export const useRegister = () => {
         }
       }
 
+      // So the "account approved" push reaches this phone (asks for notification
+      // permission; never blocks registration — {} when unavailable).
+      const push = await getPushInfoForRegistration();
+
       const email = payload.email?.trim() ? normalizeEmail(payload.email) : undefined;
-      await registerWithPhone({ ...payload, email, logoUrl });
+      await registerWithPhone({ ...payload, ...push, email, logoUrl });
       void signOutFirebase();
       await saveLastMobile(payload.mobileNumber);
 
@@ -219,7 +228,8 @@ export const useRegister = () => {
         }
       }
 
-      router.replace({ pathname: '/(auth)/login', params: { registered: '1', mobile: payload.mobileNumber } });
+      // The screen shows a "Registration submitted" step; the vendor goes to
+      // Sign in from there (navigating here, mid-keyboard, left a blank screen).
       return { ok: true };
     } catch (err) {
       setError(cleanMessage(err, 'Registration failed. Please try again.'));
