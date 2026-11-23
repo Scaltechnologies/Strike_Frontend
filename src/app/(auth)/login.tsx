@@ -1,14 +1,17 @@
 import {
-  View, TouchableOpacity, StyleSheet,
+  View, TouchableOpacity, StyleSheet, ScrollView,
   KeyboardAvoidingView, Platform, StatusBar, ActivityIndicator,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import Text from '../../components/Text';
-import TextInput from '../../components/TextInput';
-import { useState } from 'react';
+import TextInput, { type TextInputRef } from '../../components/TextInput';
+import { useEffect, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSendOtp } from '../../modules/auth/hooks/useAuth';
+import { useSignIn } from '../../modules/auth/hooks/useAuth';
+import PasswordField from '../../modules/auth/components/PasswordField';
+import { isValidEmail } from '../../modules/auth/utils/validation';
+import { getAccessToken, getMustChangePassword } from '../../core/storage/secureStorage';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -17,14 +20,8 @@ const DS = {
   primary:     '#CC2200',
   primaryDark: '#991A00',
   primarySoft: '#FFF0EE',
-  accent:      '#C17B2F',
-  accentSoft:  '#FEF6EC',
   success:     '#16A34A',
   successSoft: '#F0FDF4',
-  warning:     '#D97706',
-  warningSoft: '#FFFBEB',
-  error:       '#DC2626',
-  errorSoft:   '#FFF1F1',
   text:        '#1A1A1A',
   text2:       '#5A6272',
   text3:       '#9BA3AF',
@@ -32,10 +29,43 @@ const DS = {
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const { handleSendOtp, loading, error } = useSendOtp();
+  // registered=1 & email=… after a successful registration (useRegister);
+  // the email link (strike-frontend://login) arrives with no params.
+  const params = useLocalSearchParams<{ registered?: string; email?: string }>();
+  const { handleSignIn, loading, error, errorCode } = useSignIn();
 
-  const canSubmit = phoneNumber.length === 10 && !loading;
+  const [email, setEmail]       = useState(params.email ?? '');
+  const [password, setPassword] = useState('');
+  const [emailTouched, setEmailTouched] = useState(false);
+  const passwordRef = useRef<TextInputRef>(null);
+
+  // Opened from the email link while already signed in — don't make the
+  // vendor sign in again.
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!(await getAccessToken())) return;
+        if (await getMustChangePassword()) {
+          router.replace({ pathname: '/change-password', params: { forced: '1' } });
+        } else {
+          router.replace('/(main)/home');
+        }
+      } catch { /* stay on sign-in */ }
+    })();
+  }, []);
+
+  const emailOk   = isValidEmail(email);
+  const showEmailError = emailTouched && email.trim().length > 0 && !emailOk;
+  const canSubmit = emailOk && password.length > 0 && !loading;
+  const suggestForgot = errorCode === 'PASSWORD_NOT_SET' || errorCode === 'ACCOUNT_LOCKED';
+
+  const onSubmit = () => {
+    if (!canSubmit) return;
+    handleSignIn(email, password);
+  };
+
+  const goForgot = () =>
+    router.push({ pathname: '/(auth)/forgot-password', params: emailOk ? { email: email.trim() } : {} });
 
   return (
     <KeyboardAvoidingView
@@ -56,26 +86,68 @@ export default function LoginScreen() {
       </View>
 
       {/* Form Zone */}
-      <View style={styles.formZone}>
+      <ScrollView
+        style={styles.formZone}
+        contentContainerStyle={styles.formContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {params.registered === '1' && (
+          <View style={styles.noticeCard}>
+            <Ionicons name="checkmark-circle" size={20} color={DS.success} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.noticeTitle}>Registration submitted</Text>
+              <Text style={styles.noticeText}>
+                Once our team approves your store, we'll email your login details
+                {params.email ? ` to ${params.email}` : ''}. Use them to sign in here.
+              </Text>
+            </View>
+          </View>
+        )}
+
         <Text style={styles.formTitle}>Welcome back</Text>
         <Text style={styles.formSubtitle}>Sign in to your vendor account</Text>
 
-        <Text style={styles.inputLabel}>Mobile Number</Text>
-        <View style={styles.phoneRow}>
-          <View style={styles.countryChip}>
-            <Text style={styles.countryText}>+91</Text>
+        <Text style={styles.inputLabel}>Email</Text>
+        <TextInput
+          style={[styles.input, showEmailError && styles.inputInvalid]}
+          placeholder="store@example.com"
+          placeholderTextColor={DS.text3}
+          value={email}
+          onChangeText={setEmail}
+          onBlur={() => setEmailTouched(true)}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
+          textContentType="username"
+          maxLength={254}
+          returnKeyType="next"
+          submitBehavior="submit"
+          onSubmitEditing={() => passwordRef.current?.focus()}
+        />
+        {showEmailError && (
+          <View style={styles.fieldError}>
+            <Ionicons name="alert-circle-outline" size={14} color={DS.primary} />
+            <Text style={styles.errorText}>Enter a valid email address.</Text>
           </View>
-          <View style={styles.phoneDivider} />
-          <TextInput
-            style={styles.phoneInput}
-            placeholder="98765 43210"
-            placeholderTextColor={DS.text3}
-            keyboardType="phone-pad"
-            maxLength={10}
-            value={phoneNumber}
-            onChangeText={setPhoneNumber}
-          />
-        </View>
+        )}
+
+        <Text style={styles.inputLabel}>Password</Text>
+        <PasswordField
+          ref={passwordRef}
+          placeholder="Your password"
+          value={password}
+          onChangeText={setPassword}
+          autoComplete="current-password"
+          textContentType="password"
+          returnKeyType="go"
+          onSubmitEditing={onSubmit}
+        />
+
+        <TouchableOpacity style={styles.forgotRow} onPress={goForgot} hitSlop={{ top: 8, bottom: 8 }}>
+          <Text style={[styles.forgotText, suggestForgot && styles.forgotTextStrong]}>Forgot password?</Text>
+        </TouchableOpacity>
 
         {!!error && (
           <View style={styles.errorRow}>
@@ -86,7 +158,7 @@ export default function LoginScreen() {
 
         <TouchableOpacity
           style={[styles.primaryBtn, !canSubmit && styles.primaryBtnDisabled]}
-          onPress={() => handleSendOtp(phoneNumber)}
+          onPress={onSubmit}
           disabled={!canSubmit}
           activeOpacity={0.85}
         >
@@ -94,15 +166,15 @@ export default function LoginScreen() {
             <ActivityIndicator size="small" color="#fff" />
           ) : (
             <>
-              <Ionicons name="send-outline" size={18} color="#fff" />
-              <Text style={styles.primaryBtnText}>Get OTP</Text>
+              <Ionicons name="log-in-outline" size={18} color="#fff" />
+              <Text style={styles.primaryBtnText}>Sign In</Text>
             </>
           )}
         </TouchableOpacity>
 
         <View style={styles.dividerRow}>
           <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>or</Text>
+          <Text style={styles.dividerText}>New to Strike?</Text>
           <View style={styles.dividerLine} />
         </View>
 
@@ -120,7 +192,7 @@ export default function LoginScreen() {
           {' & '}
           <Text style={styles.termsLink} onPress={() => router.push('/privacy-policy')}>Privacy Policy</Text>
         </Text>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -147,30 +219,35 @@ const styles = StyleSheet.create({
     backgroundColor: DS.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 40,
   },
+  formContent: { paddingHorizontal: 24, paddingTop: 32, paddingBottom: 40 },
   formTitle:    { fontSize: 22, fontWeight: '800', color: DS.text, marginBottom: 4 },
   formSubtitle: { fontSize: 14, color: DS.text2, marginBottom: 28 },
 
-  // Phone input
-  inputLabel: { fontSize: 12, fontWeight: '600', color: DS.text2, marginBottom: 8 },
-  phoneRow: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: DS.bg, borderWidth: 1.5, borderColor: DS.border,
-    borderRadius: 12, marginBottom: 16, overflow: 'hidden', height: 52,
+  // Registered notice
+  noticeCard: {
+    flexDirection: 'row', gap: 10, alignItems: 'flex-start',
+    backgroundColor: DS.successSoft, borderRadius: 14, padding: 14, marginBottom: 24,
   },
-  countryChip:  { paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
-  countryText:  { fontSize: 15, fontWeight: '600', color: DS.text2 },
-  phoneDivider: { width: 1, height: 28, backgroundColor: DS.border },
-  phoneInput:   { flex: 1, paddingHorizontal: 16, fontSize: 15, color: DS.text, height: '100%' },
+  noticeTitle: { fontSize: 14, fontWeight: '700', color: DS.success, marginBottom: 2 },
+  noticeText:  { fontSize: 13, color: DS.text2, lineHeight: 19 },
+
+  // Inputs
+  inputLabel: { fontSize: 12, fontWeight: '600', color: DS.text2, marginBottom: 8 },
+  input: {
+    backgroundColor: DS.bg, borderWidth: 1.5, borderColor: DS.border,
+    borderRadius: 12, paddingHorizontal: 14, height: 52,
+    fontSize: 15, color: DS.text, marginBottom: 16,
+  },
+  inputInvalid: { borderColor: DS.primary },
+  fieldError: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -8, marginBottom: 14 },
+
+  forgotRow: { alignSelf: 'flex-end', marginTop: -6, marginBottom: 18 },
+  forgotText: { fontSize: 13, color: DS.primary, fontWeight: '600' },
+  forgotTextStrong: { textDecorationLine: 'underline' },
 
   // Error
-  errorRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    marginTop: -8, marginBottom: 12,
-  },
+  errorRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 14 },
   errorText: { fontSize: 13, color: DS.primary, flex: 1 },
 
   // Buttons

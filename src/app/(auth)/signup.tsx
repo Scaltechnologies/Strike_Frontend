@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useRegister } from '../../modules/auth/hooks/useAuth';
 import BannerPicker from '../../modules/store/components/BannerPicker';
-import { INDIAN_MOBILE_REGEX } from '../../core/firebase/firebaseAuth';
+import { INDIAN_MOBILE_REGEX, isValidEmail } from '../../modules/auth/utils/validation';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -49,6 +49,7 @@ export default function SignupScreen() {
   const [locError, setLocError]         = useState<string | null>(null);
   const [bannerUri, setBannerUri]       = useState<string | null>(null);
   const [mobileTouched, setMobileTouched] = useState(!!paramPhone);
+  const [emailTouched, setEmailTouched]   = useState(false);
 
   const scrollRef    = useRef<ScrollView>(null);
   const hotelNameRef = useRef<TextInputRef>(null);
@@ -76,7 +77,9 @@ export default function SignupScreen() {
   const coordsSet    = latitude.trim().length > 0 && longitude.trim().length > 0;
   const mobileValid  = INDIAN_MOBILE_REGEX.test(mobileNumber.trim());
   const showMobileError = mobileTouched && mobileNumber.trim().length > 0 && !mobileValid;
-  const isFormValid  = !!(hotelName.trim() && address.trim() && email.trim() && mobileValid && coordsSet);
+  const emailValid   = isValidEmail(email);
+  const showEmailError = emailTouched && email.trim().length > 0 && !emailValid;
+  const isFormValid  = !!(hotelName.trim() && address.trim() && emailValid && mobileValid && coordsSet);
 
   const handleDetectLocation = async () => {
     try {
@@ -183,21 +186,35 @@ export default function SignupScreen() {
         {/* ── CONTACT ── */}
         <Text style={styles.sectionLabel}>CONTACT</Text>
 
-        <Text style={styles.inputLabel}>Email</Text>
+        <Text style={styles.inputLabel}>Email *</Text>
         <TextInput
           ref={emailRef}
-          style={styles.input}
+          style={[styles.input, showEmailError && styles.inputInvalid]}
           placeholder="store@example.com"
           placeholderTextColor={DS.text3}
           value={email}
           onChangeText={setEmail}
+          onBlur={() => setEmailTouched(true)}
           keyboardType="email-address"
           autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
+          maxLength={254}
           onFocus={() => scrollToInput(emailRef)}
           returnKeyType="next"
           submitBehavior="submit"
           onSubmitEditing={() => mobileRef.current?.focus()}
         />
+        {showEmailError ? (
+          <View style={styles.errorRow}>
+            <Ionicons name="alert-circle-outline" size={14} color={DS.primary} />
+            <Text style={styles.errorText}>Enter a valid email address.</Text>
+          </View>
+        ) : (
+          <Text style={styles.fieldHint}>
+            You'll sign in with this email. Your password is sent here once your store is approved.
+          </Text>
+        )}
 
         <Text style={styles.inputLabel}>Mobile Number *</Text>
         <View style={[styles.phoneRow, showMobileError && styles.phoneRowError]}>
@@ -369,6 +386,8 @@ const styles = StyleSheet.create({
     fontSize: 15, color: DS.text, marginBottom: 16,
   },
   inputMultiline: { height: 84, paddingTop: 12, textAlignVertical: 'top' },
+  inputInvalid:   { borderColor: DS.primary },
+  fieldHint:      { fontSize: 12, color: DS.text3, marginTop: -10, marginBottom: 16, lineHeight: 17 },
 
   // Phone
   phoneRow: {

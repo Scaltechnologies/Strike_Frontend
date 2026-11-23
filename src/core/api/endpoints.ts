@@ -6,12 +6,14 @@ const endpoints = {
   // ── Authentication ─────────────────────────────────────────────────
   auth: {
     vendor: {
-      register:      '/api/auth/vendor/register',
-      login:         '/api/auth/vendor/login',
-      verify:        '/api/auth/vendor/verify',
-      // Firebase Phone Auth ID token exchange — the primary UI login path.
-      // register/login/verify above remain the legacy fallback path.
-      firebaseVerify: '/api/auth/vendor/firebase-verify',
+      // Submits a registration for admin review (no password, no OTP).
+      register:       '/api/auth/vendor/register',
+      // Email + password sign-in.
+      signIn:         '/api/auth/vendor/signin',
+      // Emails a new generated password (same response whether or not the email exists).
+      forgotPassword: '/api/auth/vendor/forgot-password',
+      // Bearer token required — returns fresh tokens.
+      changePassword: '/api/auth/vendor/change-password',
       // Multipart, unauthenticated (called before /register) — uploads a store
       // banner picked on the signup screen and returns a URL to include as
       // RegisterVendorRequest.logoUrl. See registerLogoUpload() in authService.ts.
