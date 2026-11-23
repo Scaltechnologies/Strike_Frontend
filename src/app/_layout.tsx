@@ -5,6 +5,13 @@ import { useFonts } from 'expo-font';
 import { View, ActivityIndicator } from 'react-native';
 import { MaintenanceGate } from '../core/maintenance/MaintenanceGate';
 import { MANROPE_FONTS } from '../core/theme/fonts';
+import AppErrorScreen from '../components/AppErrorScreen';
+
+// Any screen that throws while rendering shows this instead of a blank white
+// screen (React unmounts everything on an uncaught render error in release).
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => Promise<void> }) {
+  return <AppErrorScreen error={error} retry={retry} />;
+}
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts(MANROPE_FONTS);
