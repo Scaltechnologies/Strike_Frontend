@@ -13,6 +13,7 @@ import * as Location from 'expo-location';
 import { useRegister } from '../../modules/auth/hooks/useAuth';
 import BannerPicker from '../../modules/store/components/BannerPicker';
 import EmailVerification from '../../modules/auth/components/EmailVerification';
+import { useKeyboardAwareScroll } from '../../core/keyboard/useKeyboardAwareScroll';
 import { INDIAN_MOBILE_REGEX, isValidEmail } from '../../modules/auth/utils/validation';
 
 const DS = {
@@ -59,7 +60,10 @@ export default function SignupScreen() {
     if (errorCode === 'EMAIL_NOT_VERIFIED') setEmailToken(null);
   }, [errorCode]);
 
-  const scrollRef    = useRef<ScrollView>(null);
+  // Keyboard-aware scrolling: reserves room under the form while the keyboard is
+  // open and keeps the focused field (incl. the email code box) above it.
+  const kb = useKeyboardAwareScroll();
+  const scrollRef = kb.scrollRef;
   const hotelNameRef = useRef<TextInputRef>(null);
   const addressRef   = useRef<TextInputRef>(null);
   const emailRef     = useRef<TextInputRef>(null);
@@ -144,6 +148,8 @@ export default function SignupScreen() {
       {/* Form Zone */}
       <ScrollView
         ref={scrollRef}
+        onScroll={kb.onScroll}
+        scrollEventThrottle={kb.scrollEventThrottle}
         style={styles.formZone}
         contentContainerStyle={styles.formContent}
         keyboardShouldPersistTaps="handled"
@@ -364,6 +370,7 @@ export default function SignupScreen() {
           {' and '}
           <Text style={styles.termsLink} onPress={() => router.push('/privacy-policy')}>Privacy Policy</Text>
         </Text>
+        <View style={{ height: kb.keyboardSpace }} />
       </ScrollView>
     </KeyboardAvoidingView>
   );

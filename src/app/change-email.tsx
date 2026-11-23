@@ -19,6 +19,7 @@ import { cleanMessage } from '../modules/auth/hooks/useAuth';
 import { useCountdown, secondsFromCooldownMessage } from '../modules/auth/hooks/useCountdown';
 import { isValidEmail, normalizeEmail } from '../modules/auth/utils/validation';
 import { getSignInEmail, saveSignInEmail, saveTokens } from '../core/storage/secureStorage';
+import { useKeyboardAwareScroll } from '../core/keyboard/useKeyboardAwareScroll';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -45,6 +46,7 @@ export default function ChangeEmailScreen() {
   const { seconds, start }      = useCountdown();
   const passwordRef = useRef<TextInputRef>(null);
   const codeRef     = useRef<TextInputRef>(null);
+  const kb = useKeyboardAwareScroll();
 
   useEffect(() => { getSignInEmail().then(setCurrentEmail).catch(() => {}); }, []);
 
@@ -114,6 +116,9 @@ export default function ChangeEmailScreen() {
       </View>
 
       <ScrollView
+        ref={kb.scrollRef}
+        onScroll={kb.onScroll}
+        scrollEventThrottle={kb.scrollEventThrottle}
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -136,6 +141,7 @@ export default function ChangeEmailScreen() {
               value={newEmail}
               onChangeText={setNewEmail}
               onBlur={() => setEmailTouched(true)}
+              onFocus={() => kb.ensureVisible()}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -160,6 +166,7 @@ export default function ChangeEmailScreen() {
               placeholder="Confirm it's you"
               value={password}
               onChangeText={setPassword}
+              onFocus={() => kb.ensureVisible(80)}
               autoComplete="current-password"
               textContentType="password"
               returnKeyType="send"
@@ -233,6 +240,7 @@ export default function ChangeEmailScreen() {
             )}
           </TouchableOpacity>
         )}
+        <View style={{ height: kb.keyboardSpace }} />
       </ScrollView>
     </KeyboardAvoidingView>
   );

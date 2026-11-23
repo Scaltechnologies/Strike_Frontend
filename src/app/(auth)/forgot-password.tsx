@@ -10,6 +10,7 @@ import Text from '../../components/Text';
 import TextInput from '../../components/TextInput';
 import { useForgotPassword } from '../../modules/auth/hooks/useAuth';
 import { isValidEmail } from '../../modules/auth/utils/validation';
+import { useKeyboardAwareScroll } from '../../core/keyboard/useKeyboardAwareScroll';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -29,6 +30,7 @@ export default function ForgotPasswordScreen() {
   const { handleRequest, loading, error, sentMessage, reset } = useForgotPassword();
   const [email, setEmail] = useState(params.email ?? '');
   const [touched, setTouched] = useState(false);
+  const kb = useKeyboardAwareScroll();
 
   const emailOk = isValidEmail(email);
   const showEmailError = touched && email.trim().length > 0 && !emailOk;
@@ -57,6 +59,9 @@ export default function ForgotPasswordScreen() {
       </View>
 
       <ScrollView
+        ref={kb.scrollRef}
+        onScroll={kb.onScroll}
+        scrollEventThrottle={kb.scrollEventThrottle}
         style={styles.formZone}
         contentContainerStyle={styles.formContent}
         keyboardShouldPersistTaps="handled"
@@ -103,6 +108,8 @@ export default function ForgotPasswordScreen() {
               value={email}
               onChangeText={setEmail}
               onBlur={() => setTouched(true)}
+              // Keep the send button visible under the field.
+              onFocus={() => kb.ensureVisible(80)}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -146,6 +153,7 @@ export default function ForgotPasswordScreen() {
             </TouchableOpacity>
           </>
         )}
+        <View style={{ height: kb.keyboardSpace }} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
