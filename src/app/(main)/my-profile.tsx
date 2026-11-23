@@ -61,7 +61,7 @@ const FIELDS: Field[] = [
   { key: 'email',      label: 'Email',        placeholder: 'you@example.com', keyboardType: 'email-address',
     // Profile email is contact info (vendor-service); the sign-in email lives in
     // auth-service and is not changed by this form.
-    hint: "Contact email shown on your profile. This doesn't change the email you sign in with." },
+    hint: "Contact email shown on your profile. To change the email you sign in with, use Profile → Change Sign-in Email." },
   { key: 'mobile',     label: 'Mobile',       placeholder: '+91 98765 43210', keyboardType: 'phone-pad' },
   { key: 'category',   label: 'Category',     placeholder: 'e.g. Restaurant, Cafe' },
   { key: 'description',label: 'Description',  placeholder: 'Brief description of your business', multiline: true },

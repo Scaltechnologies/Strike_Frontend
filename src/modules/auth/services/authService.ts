@@ -10,6 +10,7 @@ import axiosInstance, { BASE_URL } from '../../../core/api/axiosInstance';
 import endpoints from '../../../core/api/endpoints';
 import {
   ChangePasswordRequest,
+  CodeSentResponse,
   RegisterVendorRequest,
   SignInRequest,
   VendorAuthResponse,
@@ -41,6 +42,39 @@ export const requestPasswordReset = async (email: string): Promise<string> => {
 // axiosInstance. Returns fresh tokens (the old refresh token is revoked).
 export const changePassword = async (payload: ChangePasswordRequest): Promise<VendorAuthResponse> => {
   const res = await axiosInstance.post<VendorAuthResponse>(endpoints.auth.vendor.changePassword, payload);
+  return res.data;
+};
+
+// POST /api/auth/vendor/email-otp/send — emails a 6-digit code (registration).
+export const sendRegistrationEmailCode = async (email: string): Promise<CodeSentResponse> => {
+  const res = await axiosInstance.post<CodeSentResponse>(endpoints.auth.vendor.emailOtpSend, { email });
+  return res.data;
+};
+
+// POST /api/auth/vendor/email-otp/verify — returns the token /register needs.
+export const verifyRegistrationEmailCode = async (email: string, code: string): Promise<string> => {
+  const res = await axiosInstance.post<{ emailVerificationToken: string }>(
+    endpoints.auth.vendor.emailOtpVerify,
+    { email, code },
+  );
+  return res.data.emailVerificationToken;
+};
+
+// POST /api/auth/vendor/change-email/request — password re-check, code to the new email.
+export const requestEmailChange = async (newEmail: string, currentPassword: string): Promise<CodeSentResponse> => {
+  const res = await axiosInstance.post<CodeSentResponse>(
+    endpoints.auth.vendor.changeEmailRequest,
+    { newEmail, currentPassword },
+  );
+  return res.data;
+};
+
+// POST /api/auth/vendor/change-email/confirm — returns fresh tokens.
+export const confirmEmailChange = async (newEmail: string, code: string): Promise<VendorAuthResponse> => {
+  const res = await axiosInstance.post<VendorAuthResponse>(
+    endpoints.auth.vendor.changeEmailConfirm,
+    { newEmail, code },
+  );
   return res.data;
 };
 

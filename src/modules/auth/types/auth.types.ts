@@ -51,4 +51,12 @@ export interface RegisterVendorRequest {
   // useRegister() then falls back to the deferred pending-banner upload on
   // the vendor's first sign-in instead.
   logoUrl?: string;
+  // From POST /api/auth/vendor/email-otp/verify — proves the vendor owns `email`.
+  emailVerificationToken: string;
+}
+
+// Backend: /email-otp/send and /change-email/request responses
+export interface CodeSentResponse {
+  message: string;
+  resendAfterSeconds: number;
 }

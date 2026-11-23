@@ -224,6 +224,13 @@ export default function ProfileScreen() {
       onPress: () => router.push('/(main)/store-settings'),
     },
     {
+      id: 'change-email',
+      icon: 'mail-outline',
+      label: 'Change Sign-in Email',
+      subtitle: 'Verify a new email to sign in with',
+      onPress: () => router.push('/change-email'),
+    },
+    {
       id: 'change-password',
       icon: 'lock-closed-outline',
       label: 'Change Password',

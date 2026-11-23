@@ -21,6 +21,7 @@ import {
   getPendingBanner,
   clearPendingBanner,
   setMustChangePassword,
+  saveSignInEmail,
   clearAll,
 } from '../../../core/storage/secureStorage';
 import { RegisterVendorRequest, VendorAuthResponse } from '../types/auth.types';
@@ -34,7 +35,7 @@ type ApiError = Error & { status?: number; code?: string };
 
 // axiosInstance shapes HTTP errors as "[401] /api/auth/vendor/signin — <message>".
 // The backend message is already user-facing copy, so show just that part.
-function cleanMessage(err: unknown, fallback: string): string {
+export function cleanMessage(err: unknown, fallback: string): string {
   const msg = getUserMessage(err, fallback);
   return msg.replace(/^\[\d{3}\]\s+\S+\s+—\s+/, '').trim() || fallback;
 }
@@ -46,6 +47,7 @@ function errorCode(err: unknown): string | undefined {
 // Persist the session and route to the right place for this sign-in.
 async function completeSignIn(response: VendorAuthResponse): Promise<void> {
   await saveTokens({ accessToken: response.token, refreshToken: response.refreshToken });
+  if (response.email) await saveSignInEmail(response.email);
   const mustChange = !!response.mustChangePassword;
   await setMustChangePassword(mustChange);
 
@@ -171,11 +173,14 @@ export const signOutLocally = async (): Promise<void> => {
 export const useRegister = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // e.g. EMAIL_NOT_VERIFIED (verification token expired) → the form re-verifies.
+  const [errorCodeState, setErrorCode] = useState<string | undefined>(undefined);
 
   const handleRegister = async (payload: RegisterVendorRequest, bannerUri?: string) => {
     try {
       setLoading(true);
       setError(null);
+      setErrorCode(undefined);
 
       let logoUrl: string | undefined;
       if (bannerUri) {
@@ -199,11 +204,12 @@ export const useRegister = () => {
 
       router.replace({ pathname: '/(auth)/login', params: { registered: '1', email } });
     } catch (err) {
+      setErrorCode(errorCode(err));
       setError(cleanMessage(err, 'Registration failed. Please try again.'));
     } finally {
       setLoading(false);
     }
   };
 
-  return { handleRegister, loading, error };
+  return { handleRegister, loading, error, errorCode: errorCodeState };
 };
