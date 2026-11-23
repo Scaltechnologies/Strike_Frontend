@@ -12,6 +12,7 @@ import { useSignIn } from '../../modules/auth/hooks/useAuth';
 import PasswordField from '../../modules/auth/components/PasswordField';
 import { isValidEmail } from '../../modules/auth/utils/validation';
 import { getAccessToken, getMustChangePassword } from '../../core/storage/secureStorage';
+import { useKeyboardAwareScroll } from '../../core/keyboard/useKeyboardAwareScroll';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -38,6 +39,8 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [emailTouched, setEmailTouched] = useState(false);
   const passwordRef = useRef<TextInputRef>(null);
+  const kb = useKeyboardAwareScroll();
+  const keyboardOpen = kb.keyboardSpace > 0;
 
   // Opened from the email link while already signed in — don't make the
   // vendor sign in again.
@@ -75,18 +78,24 @@ export default function LoginScreen() {
       <StatusBar barStyle="light-content" backgroundColor={DS.primary} />
 
       {/* Brand Zone */}
-      <View style={styles.brandZone}>
-        <View style={[styles.brandContent, { paddingTop: insets.top + 36 }]}>
-          <View style={styles.logoMark}>
-            <Text style={styles.logoMarkText}>S</Text>
-          </View>
-          <Text style={styles.wordmark}>STRIKE</Text>
-          <Text style={styles.tagline}>Your business, powered by loyalty.</Text>
+      {/* Collapses to just the wordmark while typing, to leave room for the form. */}
+      <View style={[styles.brandZone, keyboardOpen && styles.brandZoneCompact]}>
+        <View style={[styles.brandContent, { paddingTop: insets.top + (keyboardOpen ? 10 : 36) }]}>
+          {!keyboardOpen && (
+            <View style={styles.logoMark}>
+              <Text style={styles.logoMarkText}>S</Text>
+            </View>
+          )}
+          <Text style={[styles.wordmark, keyboardOpen && styles.wordmarkCompact]}>STRIKE</Text>
+          {!keyboardOpen && <Text style={styles.tagline}>Your business, powered by loyalty.</Text>}
         </View>
       </View>
 
       {/* Form Zone */}
       <ScrollView
+        ref={kb.scrollRef}
+        onScroll={kb.onScroll}
+        scrollEventThrottle={kb.scrollEventThrottle}
         style={styles.formZone}
         contentContainerStyle={styles.formContent}
         keyboardShouldPersistTaps="handled"
@@ -116,6 +125,7 @@ export default function LoginScreen() {
           value={email}
           onChangeText={setEmail}
           onBlur={() => setEmailTouched(true)}
+          onFocus={() => kb.ensureVisible()}
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
@@ -139,6 +149,8 @@ export default function LoginScreen() {
           placeholder="Your password"
           value={password}
           onChangeText={setPassword}
+          // Keep the Sign In button visible under the field too.
+          onFocus={() => kb.ensureVisible(90)}
           autoComplete="current-password"
           textContentType="password"
           returnKeyType="go"
@@ -192,6 +204,7 @@ export default function LoginScreen() {
           {' & '}
           <Text style={styles.termsLink} onPress={() => router.push('/privacy-policy')}>Privacy Policy</Text>
         </Text>
+        <View style={{ height: kb.keyboardSpace }} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -202,6 +215,8 @@ const styles = StyleSheet.create({
 
   // Brand Zone
   brandZone:    { backgroundColor: DS.primary, paddingBottom: 32 },
+  brandZoneCompact: { paddingBottom: 14 },
+  wordmarkCompact:  { fontSize: 18, letterSpacing: 5, marginBottom: 0 },
   brandContent: { alignItems: 'center', paddingBottom: 8 },
   logoMark: {
     width: 56, height: 56, borderRadius: 16,

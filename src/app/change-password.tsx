@@ -17,6 +17,7 @@ import { type TextInputRef } from '../components/TextInput';
 import PasswordField from '../modules/auth/components/PasswordField';
 import { useChangePassword, signOutLocally } from '../modules/auth/hooks/useAuth';
 import { isStrongPassword, passwordRules } from '../modules/auth/utils/validation';
+import { useKeyboardAwareScroll } from '../core/keyboard/useKeyboardAwareScroll';
 
 const DS = {
   bg:          '#F6F7FA',
@@ -44,6 +45,7 @@ export default function ChangePasswordScreen() {
   const [confirmTouched, setConfirmTouched] = useState(false);
   const nextRef    = useRef<TextInputRef>(null);
   const confirmRef = useRef<TextInputRef>(null);
+  const kb = useKeyboardAwareScroll();
 
   // Forced mode: Android back must not escape to the app.
   useFocusEffect(
@@ -97,6 +99,9 @@ export default function ChangePasswordScreen() {
       </View>
 
       <ScrollView
+        ref={kb.scrollRef}
+        onScroll={kb.onScroll}
+        scrollEventThrottle={kb.scrollEventThrottle}
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -117,6 +122,7 @@ export default function ChangePasswordScreen() {
             placeholder={isForced ? 'Emailed password' : 'Current password'}
             value={current}
             onChangeText={setCurrent}
+            onFocus={() => kb.ensureVisible()}
             autoComplete="current-password"
             textContentType="password"
             returnKeyType="next"
@@ -130,6 +136,8 @@ export default function ChangePasswordScreen() {
             placeholder="New password"
             value={next}
             onChangeText={setNext}
+            // Keep the live rules list under this field in view while typing.
+            onFocus={() => kb.ensureVisible(100)}
             autoComplete="new-password"
             textContentType="newPassword"
             returnKeyType="next"
@@ -163,6 +171,8 @@ export default function ChangePasswordScreen() {
             value={confirm}
             onChangeText={setConfirm}
             onBlur={() => setConfirmTouched(true)}
+            // Keep the Save button visible under the last field.
+            onFocus={() => kb.ensureVisible(80)}
             invalid={showMismatch}
             autoComplete="new-password"
             textContentType="newPassword"
@@ -205,6 +215,7 @@ export default function ChangePasswordScreen() {
             <Text style={styles.linkText}>Sign out</Text>
           </TouchableOpacity>
         )}
+        <View style={{ height: kb.keyboardSpace }} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
