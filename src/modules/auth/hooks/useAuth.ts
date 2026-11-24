@@ -23,9 +23,12 @@ import {
   getPendingBanner,
   clearPendingBanner,
   saveLastMobile,
+  saveSession,
   clearAll,
 } from '../../../core/storage/secureStorage';
-import { PhoneRegisterRequest, VendorAuthResponse } from '../types/auth.types';
+import { PhoneRegisterRequest, RoleOption, SessionActor, VendorAuthResponse } from '../types/auth.types';
+
+export type SignInOutcome = 'signed-in' | 'failed' | { choose: RoleOption[] };
 import { uploadStoreBanner } from '../../store/services/storeService';
 import { getUserMessage } from '../../../core/api/errorMessage';
 import { normalizeEmail } from '../utils/validation';
@@ -53,12 +56,21 @@ export const isOtpProofError = (err: unknown): boolean => {
   return OTP_PROOF_ERROR_CODES.has(errorCodeOf(err) ?? '') || status === 401;
 };
 
-// Persist the session and go Home.
-async function completeSignIn(response: VendorAuthResponse): Promise<void> {
+// Persist the session and go Home. canSwitchStore: the number could also open
+// another store (it went through the store chooser) — Profile offers "Switch store".
+async function completeSignIn(response: VendorAuthResponse, canSwitchStore = false): Promise<void> {
   if (!response.token || !response.refreshToken) {
     throw new Error('Could not sign in. Please try again.');
   }
   await saveTokens({ accessToken: response.token, refreshToken: response.refreshToken });
+  await saveSession({
+    actor: response.actor === 'MANAGER' ? 'MANAGER' : 'OWNER',
+    storeId: response.storeId,
+    storeName: response.storeName,
+    managerName: response.managerName,
+    mobileNumber: response.mobileNumber,
+    canSwitchStore,
+  });
   if (response.mobileNumber) await saveLastMobile(response.mobileNumber);
 
   // A banner picked at signup whose immediate upload failed is kept locally,
@@ -91,18 +103,30 @@ export const useSignIn = () => {
   // point at "Forgot PIN?" when that's the way forward.
   const [errorCode, setErrorCode] = useState<string | undefined>(undefined);
 
-  const handleSignIn = async (mobileNumber: string, pin: string): Promise<boolean> => {
+  // Resolves to:
+  //   'signed-in'          — navigated Home
+  //   { choose: options }  — correct PIN, number can open two stores → show the
+  //                          store chooser, then call again with signInAs
+  //   'failed'             — show `error`
+  const handleSignIn = async (
+    mobileNumber: string,
+    pin: string,
+    signInAs?: SessionActor,
+  ): Promise<SignInOutcome> => {
     try {
       setLoading(true);
       setError(null);
       setErrorCode(undefined);
-      const response = await signInWithPin({ mobileNumber: mobileNumber.trim(), pin });
-      await completeSignIn(response);
-      return true;
+      const response = await signInWithPin({ mobileNumber: mobileNumber.trim(), pin, signInAs });
+      if (response.roleSelectionRequired && response.roleOptions?.length) {
+        return { choose: response.roleOptions };
+      }
+      await completeSignIn(response, !!signInAs);
+      return 'signed-in';
     } catch (err) {
       setErrorCode(errorCodeOf(err));
       setError(cleanMessage(err, 'Could not sign in. Please try again.'));
-      return false;
+      return 'failed';
     } finally {
       setLoading(false);
     }
@@ -123,12 +147,23 @@ export const useResetPin = () => {
   const handleReset = async (
     firebaseIdToken: string,
     newPin: string,
-  ): Promise<{ result: 'signed-in' } | { result: 'pending'; message: string } | { result: 'failed'; otpProblem: boolean }> => {
+  ): Promise<
+    | { result: 'signed-in' }
+    | { result: 'pending'; message: string }
+    | { result: 'choose'; options: RoleOption[]; mobileNumber: string }
+    | { result: 'failed'; otpProblem: boolean }
+  > => {
     try {
       setLoading(true);
       setError(null);
       const response = await resetPin({ firebaseIdToken, newPin });
       void signOutFirebase();
+      // PIN saved; the number can open two stores → the screen asks which one and
+      // signs in with the new PIN (the OTP proof is single-use, so not via reset again).
+      if (response.roleSelectionRequired && response.roleOptions?.length && response.mobileNumber) {
+        await saveLastMobile(response.mobileNumber);
+        return { result: 'choose', options: response.roleOptions, mobileNumber: response.mobileNumber };
+      }
       if (response.token && response.refreshToken) {
         await completeSignIn(response);
         return { result: 'signed-in' };

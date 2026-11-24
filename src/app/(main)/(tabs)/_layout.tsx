@@ -3,6 +3,7 @@ import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Text from '../../../components/Text';
+import { useSession } from '../../../modules/auth/hooks/useSession';
 
 const PRIMARY = '#CC2200';
 const TEXT_MUTED = '#9BA3AF';
@@ -15,14 +16,19 @@ const TABS = [
   { name: 'profile',      label: 'Profile',      icon: 'person-outline' as const,     activeIcon: 'person' as const },
 ];
 
-function CustomTabBar({ state, navigation }: any) {
+// Earnings screens — store managers can't open them (the backend refuses the
+// ledger, wallet and analytics calls they make), so their tabs are hidden.
+const OWNER_ONLY_TABS = new Set(['transactions', 'dashboard']);
+
+function CustomTabBar({ state, navigation, isManager }: any) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
       {state.routes.map((route: any, i: number) => {
         const focused = state.index === i;
-        const tab = TABS[i];
+        const tab = TABS.find(t => t.name === route.name);
         if (!tab) return null;
+        if (isManager && OWNER_ONLY_TABS.has(tab.name)) return null;
 
         return (
           <TouchableOpacity
@@ -47,9 +53,10 @@ function CustomTabBar({ state, navigation }: any) {
 }
 
 export default function TabsLayout() {
+  const { isManager } = useSession();
   return (
     <Tabs
-      tabBar={(props) => <CustomTabBar {...props} />}
+      tabBar={(props) => <CustomTabBar {...props} isManager={isManager} />}
       screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen name="home" />

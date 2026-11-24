@@ -15,7 +15,9 @@ import Text from '../../components/Text';
 import TextInput from '../../components/TextInput';
 import PhoneOtpStep from '../../modules/auth/components/PhoneOtpStep';
 import PinSetupStep from '../../modules/auth/components/PinSetupStep';
-import { useResetPin } from '../../modules/auth/hooks/useAuth';
+import { useResetPin, useSignIn } from '../../modules/auth/hooks/useAuth';
+import StoreChooserModal from '../../modules/auth/components/StoreChooserModal';
+import type { RoleOption, SessionActor } from '../../modules/auth/types/auth.types';
 import { isValidMobile } from '../../modules/auth/utils/validation';
 import { useKeyboardAwareScroll } from '../../core/keyboard/useKeyboardAwareScroll';
 
@@ -73,10 +75,25 @@ export default function ForgotPinScreen() {
     }, [step, back]),
   );
 
+  // Number that owns a store AND manages another: PIN saved → pick which to open.
+  const signIn = useSignIn();
+  const [storeChoice, setStoreChoice] = useState<{ options: RoleOption[]; mobile: string; pin: string } | null>(null);
+  const [choosing, setChoosing] = useState<SessionActor | null>(null);
+
+  const chooseStore = async (role: SessionActor) => {
+    if (!storeChoice) return;
+    setChoosing(role);
+    const outcome = await signIn.handleSignIn(storeChoice.mobile, storeChoice.pin, role);
+    setChoosing(null);
+    if (outcome === 'signed-in') setStoreChoice(null);
+  };
+
   const onSavePin = async (pin: string) => {
     if (!token) { goToStep('otp'); return; }
     const res = await handleReset(token, pin);
-    if (res.result === 'pending') {
+    if (res.result === 'choose') {
+      setStoreChoice({ options: res.options, mobile: res.mobileNumber, pin });
+    } else if (res.result === 'pending') {
       Alert.alert('PIN saved', res.message, [
         { text: 'OK', onPress: () => router.replace({ pathname: '/(auth)/login', params: { mobile } }) },
       ]);
@@ -188,6 +205,20 @@ export default function ForgotPinScreen() {
         </View>
         <View style={{ height: kb.keyboardSpace }} />
       </ScrollView>
+
+      <StoreChooserModal
+        visible={!!storeChoice}
+        options={storeChoice?.options ?? []}
+        pending={choosing}
+        error={signIn.error}
+        onChoose={chooseStore}
+        // PIN is already saved — cancelling just goes to Sign in with the number filled in.
+        onCancel={() => {
+          const m = storeChoice?.mobile ?? mobile;
+          setStoreChoice(null);
+          router.replace({ pathname: '/(auth)/login', params: { mobile: m } });
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }

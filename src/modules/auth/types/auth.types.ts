@@ -20,12 +20,43 @@ export interface VendorAuthResponse {
   address?: string;
   status: VendorStatus;
   message?: string;
+  // 'OWNER' for the vendor themself, 'MANAGER' for a store manager an admin
+  // added to the store (they sign in with their own number + PIN).
+  actor?: SessionActor;
+  storeId?: number;
+  storeName?: string;
+  managerName?: string;
+  // Correct PIN, but the number can open two stores (own as OWNER, another as
+  // MANAGER). No tokens — show roleOptions and sign in again with signInAs.
+  roleSelectionRequired?: boolean;
+  roleOptions?: RoleOption[];
+}
+
+export type SessionActor = 'OWNER' | 'MANAGER';
+
+export interface RoleOption {
+  role: SessionActor;
+  title: string;    // store name
+  subtitle: string; // "Your store" / "You're the manager"
+}
+
+// Who is signed in on this device — persisted next to the tokens.
+export interface SessionInfo {
+  actor: SessionActor;
+  storeId?: number;
+  storeName?: string;
+  managerName?: string;
+  mobileNumber?: string;
+  // This number can also open another store — Profile offers "Switch store".
+  canSwitchStore?: boolean;
 }
 
 // Backend: POST /api/auth/vendor/pin/signin body
 export interface PinSignInRequest {
   mobileNumber: string;
   pin: string;
+  // Only for numbers that can open two stores — the store chosen in the app.
+  signInAs?: SessionActor;
 }
 
 // Backend: POST /api/auth/vendor/pin/change body (bearer token required)
@@ -38,6 +69,7 @@ export interface ChangePinRequest {
 export interface ResetPinRequest {
   firebaseIdToken: string;
   newPin: string;
+  signInAs?: SessionActor;
 }
 
 // Backend: POST /api/auth/vendor/phone/register body. The mobile number is

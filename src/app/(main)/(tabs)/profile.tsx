@@ -24,6 +24,10 @@ import type {
 import type { StoreStatus } from '../../../modules/store/types/store.types';
 import { SkeletonBlock } from '../../../components/Skeleton';
 import FadeIn from '../../../components/FadeIn';
+import { useSession } from '../../../modules/auth/hooks/useSession';
+import { signOutLocally } from '../../../modules/auth/hooks/useAuth';
+
+const OWNER_ONLY_ROWS = new Set(['wallet', 'my-profile', 'delete-account']);
 
 const DS = {
   bg:          '#F6F7FA',
@@ -132,6 +136,7 @@ export default function ProfileScreen() {
   const [loading, setLoading]         = useState(true);
   const [refreshing, setRefreshing]   = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const { session, isManager } = useSession();
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
@@ -165,6 +170,11 @@ export default function ProfileScreen() {
     await clearAll();
     router.replace('/(auth)/welcome');
   };
+
+  // Store managers: no wallet/payouts, no owner business profile, no account
+  // deletion — the backend refuses those for manager sessions anyway.
+  const visible = (rows: NavRowDef[]) =>
+    isManager ? rows.filter(r => !OWNER_ONLY_ROWS.has(r.id)) : rows;
 
   const shopName = profile?.shopName ?? '';
   const initials = shopName.split(' ').slice(0, 2).map(w => w.charAt(0)).join('').toUpperCase() || 'V';
@@ -209,6 +219,14 @@ export default function ProfileScreen() {
   ];
 
   const accountRows: NavRowDef[] = [
+    // Number that owns a store AND manages another — sign out and pick again.
+    ...(session?.canSwitchStore ? [{
+      id: 'switch-store',
+      icon: 'swap-horizontal-outline' as const,
+      label: 'Switch store',
+      subtitle: isManager ? 'Open your own store instead' : 'Open the store you manage instead',
+      onPress: () => { void signOutLocally(); },
+    }] : []),
     {
       id: 'my-profile',
       icon: 'person-circle-outline',
@@ -292,7 +310,11 @@ export default function ProfileScreen() {
               <Text style={styles.shopName} numberOfLines={1}>
                 {shopName || 'My Store'}
               </Text>
-              {!!profile?.ownerName && (
+              {isManager ? (
+                <Text style={styles.ownerName} numberOfLines={1}>
+                  {session?.managerName ? `${session.managerName} · ` : ''}Store Manager
+                </Text>
+              ) : !!profile?.ownerName && (
                 <Text style={styles.ownerName} numberOfLines={1}>{profile.ownerName}</Text>
               )}
               {!!vstatus && (
@@ -308,11 +330,15 @@ export default function ProfileScreen() {
             {/* Stats strip */}
             {!!vstatus && (
               <View style={styles.statsRow}>
-                <View style={styles.statCard}>
-                  <Text style={styles.statValue}>{vstatus.commissionRate}%</Text>
-                  <Text style={styles.statLabel}>COMMISSION</Text>
-                </View>
-                <View style={styles.statDivider} />
+                {!isManager && (
+                  <>
+                    <View style={styles.statCard}>
+                      <Text style={styles.statValue}>{vstatus.commissionRate}%</Text>
+                      <Text style={styles.statLabel}>COMMISSION</Text>
+                    </View>
+                    <View style={styles.statDivider} />
+                  </>
+                )}
                 <View style={styles.statCard}>
                   <Text style={[styles.statValue, { color: DS.success }]}>
                     {activeCards ?? '—'}
@@ -338,8 +364,8 @@ export default function ProfileScreen() {
 
         {/* Nav sections */}
         <View style={styles.sectionsWrap}>
-          <Section title="BUSINESS"  rows={businessRows} />
-          <Section title="ACCOUNT"   rows={accountRows}  />
+          <Section title="BUSINESS"  rows={visible(businessRows)} />
+          <Section title="ACCOUNT"   rows={visible(accountRows)}  />
           <Section title="SUPPORT"   rows={supportRows}  />
 
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>

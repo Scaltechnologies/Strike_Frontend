@@ -2,7 +2,7 @@
 
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { AuthTokens } from '../../modules/auth/types/auth.types';
+import { AuthTokens, SessionInfo } from '../../modules/auth/types/auth.types';
 
 const KEYS = {
   ACCESS_TOKEN: 'access_token',
@@ -12,6 +12,7 @@ const KEYS = {
   MUST_CHANGE_PASSWORD: 'must_change_password',
   SIGNIN_EMAIL: 'signin_email',
   LAST_MOBILE: 'last_signin_mobile',
+  SESSION: 'auth_session',
 } as const;
 
 // expo-secure-store has no web implementation — calling it there throws
@@ -111,11 +112,31 @@ export const getLastMobile = async (): Promise<string | null> => {
   return await getItem(KEYS.LAST_MOBILE);
 };
 
+// ── Session (owner vs store manager) ─────────────
+//
+// Saved at sign-in. Older sessions (before managers existed) have no entry and
+// are treated as the owner.
+
+export const saveSession = async (session: SessionInfo): Promise<void> => {
+  await setItem(KEYS.SESSION, JSON.stringify(session));
+};
+
+export const getSession = async (): Promise<SessionInfo | null> => {
+  const raw = await getItem(KEYS.SESSION);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as SessionInfo;
+  } catch {
+    return null;
+  }
+};
+
 // ── Clear All (Logout) ────────────────────────────
 
 export const clearAll = async (): Promise<void> => {
   await clearTokens();
   await clearUser();
+  await deleteItem(KEYS.SESSION);
   // Leftovers from the email/password sign-in era.
   await deleteItem(KEYS.MUST_CHANGE_PASSWORD);
   await deleteItem(KEYS.SIGNIN_EMAIL);

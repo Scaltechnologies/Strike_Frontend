@@ -10,6 +10,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSignIn } from '../../modules/auth/hooks/useAuth';
 import PinInput from '../../modules/auth/components/PinInput';
+import StoreChooserModal from '../../modules/auth/components/StoreChooserModal';
+import type { RoleOption, SessionActor } from '../../modules/auth/types/auth.types';
 import { isValidMobile, PIN_LENGTH } from '../../modules/auth/utils/validation';
 import { getAccessToken, getLastMobile } from '../../core/storage/secureStorage';
 import { useKeyboardAwareScroll } from '../../core/keyboard/useKeyboardAwareScroll';
@@ -74,12 +76,34 @@ export default function LoginScreen() {
   const suggestForgot = FORGOT_CODES.has(errorCode ?? '');
   const notRegistered = errorCode === 'NOT_REGISTERED';
 
+  // Number that owns a store AND manages another: after the PIN, pick one.
+  const [storeOptions, setStoreOptions] = useState<RoleOption[] | null>(null);
+  const [choosing, setChoosing] = useState<SessionActor | null>(null);
+  const [chosenPin, setChosenPin] = useState('');
+
   const submit = async (p = pin) => {
     if (!mobileOk || p.length !== PIN_LENGTH || loading) return;
-    const ok = await handleSignIn(mobile, p);
-    if (!ok) {
+    const outcome = await handleSignIn(mobile, p);
+    if (outcome === 'failed') {
       setPin('');
+    } else if (typeof outcome === 'object') {
+      setChosenPin(p);
+      setStoreOptions(outcome.choose);
     }
+  };
+
+  const chooseStore = async (role: SessionActor) => {
+    setChoosing(role);
+    const outcome = await handleSignIn(mobile, chosenPin, role);
+    setChoosing(null);
+    if (outcome === 'signed-in') { setStoreOptions(null); setChosenPin(''); }
+  };
+
+  const cancelChooser = () => {
+    setStoreOptions(null);
+    setChosenPin('');
+    setPin('');
+    clearError();
   };
 
   const goForgot = () =>
@@ -237,6 +261,15 @@ export default function LoginScreen() {
         </Text>
         <View style={{ height: kb.keyboardSpace }} />
       </ScrollView>
+
+      <StoreChooserModal
+        visible={!!storeOptions}
+        options={storeOptions ?? []}
+        pending={choosing}
+        error={storeOptions ? error : null}
+        onChoose={chooseStore}
+        onCancel={cancelChooser}
+      />
     </KeyboardAvoidingView>
   );
 }
