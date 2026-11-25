@@ -9,6 +9,10 @@
 // On each cold start this checks for an update, downloads it and restarts into
 // it before showing the app. Bounded by timeouts, so a slow or offline phone
 // just opens the app it already has. Never runs in development / Expo Go.
+//
+// This is the ONLY update check: app.json sets updates.checkAutomatically to
+// ON_ERROR_RECOVERY, so expo-updates itself only steps in to roll back an
+// update that crashes on launch.
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -49,8 +53,8 @@ export function LaunchUpdateGate({ children }: { children: ReactNode }) {
           }
         }
       } catch {
-        // Offline, slow or update server error — open what we have; expo-updates
-        // still finishes any background download for next time.
+        // Offline, slow or update server error — open what we have. A download
+        // that timed out keeps going natively and is used from the next launch.
       }
       if (!cancelled) setReady(true);
     })();

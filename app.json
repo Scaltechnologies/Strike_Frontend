@@ -8,7 +8,7 @@
     },
     "updates": {
       "url": "https://u.expo.dev/208fbff4-8198-43ba-b48d-f85c9c3f5353",
-      "checkAutomatically": "ON_LOAD",
+      "checkAutomatically": "ON_ERROR_RECOVERY",
       "fallbackToCacheTimeout": 0
     },
     "scheme": "strike-frontend",
