@@ -18,6 +18,7 @@ import {
   CategoryResponse,
   MenuItemResponse,
   CreateMenuItemRequest,
+  MenuChange,
 } from '../../../modules/menu/hooks/useMenu';
 import CategorySelectorSheet from '../../../modules/menu/components/CategorySelectorSheet';
 import { getLastUsedCategoryId, setLastUsedCategoryId } from '../../../modules/menu/state/lastUsedCategory';
@@ -426,9 +427,15 @@ function ItemFormModal({
     savingRef.current = true;
     setSaving(true);
     try {
-      initial ? await onEdit(initial.id, payload) : await onCreate(payload);
+      const result = initial ? await onEdit(initial.id, payload) : await onCreate(payload);
 
-      onSaved(initial ? 'Item updated' : 'Item added', categoryId);
+      // With approval on, the change waits for Strike instead of going live.
+      onSaved(
+        result?.pendingApproval
+          ? 'Sent to Strike for approval'
+          : initial ? 'Item updated' : 'Item added',
+        categoryId,
+      );
       if (addAnother && !initial) {
         resetForAnother();
       } else {
@@ -821,6 +828,14 @@ function MenuRow({
           {!!catName && <Text style={styles.rowDot}>·</Text>}
           {!!catName && <Text style={styles.rowCat}>{catName}</Text>}
         </View>
+        {item.pendingChange?.status === 'PENDING' && (
+          <View style={styles.pendingTag}>
+            <Ionicons name="time-outline" size={11} color={DS.warning} />
+            <Text style={styles.pendingTagText}>
+              {item.pendingChange.action === 'DELETE' ? 'Removal waiting for approval' : 'Change waiting for approval'}
+            </Text>
+          </View>
+        )}
       </View>
 
       <Switch
@@ -939,11 +954,90 @@ const AVAIL_FILTERS: { key: AvailFilter; label: string }[] = [
   { key: 'OUT_OF_STOCK', label: 'Inactive' },
 ];
 
+// ── Approval strip ────────────────────────────────────────────────────
+// When Strike's admin has menu approval on, adds / edits / removals wait for
+// review. This sits above the list: a short note, new items that are still
+// waiting, and recent decisions that weren't approved (with the reason).
+
+const CHANGE_LABEL: Record<MenuChange['action'], string> = {
+  CREATE: 'New item',
+  UPDATE: 'Change to',
+  DELETE: 'Remove',
+  IMAGE:  'New photo for',
+};
+
+function ApprovalStrip({
+  changes, approvalRequired, onWithdraw,
+}: {
+  changes: MenuChange[];
+  approvalRequired: boolean;
+  onWithdraw: (change: MenuChange) => void;
+}) {
+  const [hidden, setHidden] = useState<Set<number>>(new Set());
+  const pending = changes.filter(c => c.status === 'PENDING');
+  const newItems = pending.filter(c => c.action === 'CREATE');
+  const rejected = changes.filter(c => c.status === 'REJECTED' && !hidden.has(c.id)).slice(0, 3);
+  if (!approvalRequired && pending.length === 0 && rejected.length === 0) return null;
+
+  return (
+    <View style={styles.approvalWrap}>
+      {approvalRequired && (
+        <View style={styles.approvalNote}>
+          <Ionicons name="shield-checkmark-outline" size={16} color={DS.accent} />
+          <Text style={styles.approvalNoteText}>
+            Menu changes go live after Strike approves them. Turning items in or out of stock is instant.
+            {pending.length > 0 ? `  ·  ${pending.length} waiting` : ''}
+          </Text>
+        </View>
+      )}
+
+      {newItems.map(c => (
+        <View key={c.id} style={styles.changeCard}>
+          <View style={[styles.changeIcon, { backgroundColor: DS.warningSoft }]}>
+            <Ionicons name="time-outline" size={16} color={DS.warning} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.changeTitle} numberOfLines={1}>
+              {CHANGE_LABEL[c.action]}: {c.changes?.name ?? c.itemName}
+              {c.changes?.price != null ? `  ·  ₹${c.changes.price}` : ''}
+            </Text>
+            <Text style={styles.changeSub}>Waiting for Strike's approval</Text>
+          </View>
+          <TouchableOpacity onPress={() => onWithdraw(c)} style={styles.withdrawBtn} activeOpacity={0.8}>
+            <Text style={styles.withdrawText}>Withdraw</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
+
+      {rejected.map(c => (
+        <View key={c.id} style={[styles.changeCard, { borderColor: '#FBD5D5' }]}>
+          <View style={[styles.changeIcon, { backgroundColor: DS.errorSoft }]}>
+            <Ionicons name="close-circle-outline" size={16} color={DS.error} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.changeTitle} numberOfLines={1}>
+              Not approved: {CHANGE_LABEL[c.action].toLowerCase()} {c.changes?.name ?? c.itemName}
+            </Text>
+            {!!c.reviewNote && <Text style={styles.changeSub} numberOfLines={2}>“{c.reviewNote}”</Text>}
+          </View>
+          <TouchableOpacity
+            onPress={() => setHidden(prev => new Set(prev).add(c.id))}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="close" size={16} color={DS.text3} />
+          </TouchableOpacity>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export default function MenuScreen() {
   const insets = useSafeAreaInsets();
   const {
     categories, items, loading, refreshing, loadError, refresh,
     toggleAvailability, addItem, editItem, removeItem,
+    changes, approvalRequired, withdrawChange,
   } = useMenu();
 
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
@@ -1000,9 +1094,9 @@ export default function MenuScreen() {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
           try {
-            await removeItem(item.id);
+            const { pendingApproval } = await removeItem(item.id);
             setDetailItem(null);
-            showToast('Item deleted', 'err');
+            showToast(pendingApproval ? 'Removal sent to Strike for approval' : 'Item deleted', pendingApproval ? 'ok' : 'err');
           } catch (err: any) {
             alert('Error', err?.message ?? 'Failed to delete item');
           }
@@ -1010,6 +1104,23 @@ export default function MenuScreen() {
       },
     ]);
   }, [removeItem, showToast, alert]);
+
+  const handleWithdraw = useCallback((change: MenuChange) => {
+    alert('Withdraw request', `Stop asking Strike to ${change.action === 'CREATE' ? 'add' : 'change'} "${change.changes?.name ?? change.itemName}"?`, [
+      { text: 'Keep', style: 'cancel' },
+      {
+        text: 'Withdraw', style: 'destructive',
+        onPress: async () => {
+          try {
+            await withdrawChange(change.id);
+            showToast('Request withdrawn', 'ok');
+          } catch (err) {
+            alert('Error', getUserMessage(err, 'Could not withdraw the request.'));
+          }
+        },
+      },
+    ]);
+  }, [withdrawChange, showToast, alert]);
 
   // ItemFormModal only reports back here once a save has fully gone through.
   // It also passes the categoryId that was actually used, so it becomes this
@@ -1186,6 +1297,9 @@ export default function MenuScreen() {
                   onPress={() => setDetailItem(item)}
                 />
               )}
+              ListHeaderComponent={
+                <ApprovalStrip changes={changes} approvalRequired={approvalRequired} onWithdraw={handleWithdraw} />
+              }
               ListEmptyComponent={
                 <View style={styles.empty}>
                   <Ionicons name="restaurant-outline" size={44} color={DS.border} />
@@ -1368,6 +1482,29 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 15, color: DS.text3, fontWeight: '600' },
   emptyHint:  { fontSize: 13, color: DS.text3 },
+
+  // Approval (menu changes waiting for Strike)
+  pendingTag: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
+    marginTop: 5, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999,
+    backgroundColor: DS.warningSoft,
+  },
+  pendingTagText: { fontSize: 10.5, fontWeight: '600', color: DS.warning },
+  approvalWrap:   { gap: 8, marginBottom: 12 },
+  approvalNote: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    padding: 10, borderRadius: 12, backgroundColor: DS.accentSoft,
+  },
+  approvalNoteText: { flex: 1, fontSize: 12, lineHeight: 17, color: DS.text2 },
+  changeCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    padding: 10, borderRadius: 12, borderWidth: 1, borderColor: DS.border, backgroundColor: DS.surface,
+  },
+  changeIcon:   { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  changeTitle:  { fontSize: 13, fontWeight: '600', color: DS.text },
+  changeSub:    { fontSize: 11.5, color: DS.text2, marginTop: 1 },
+  withdrawBtn:  { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: DS.bg },
+  withdrawText: { fontSize: 11.5, fontWeight: '600', color: DS.text2 },
 
   // Toast
   toast: {

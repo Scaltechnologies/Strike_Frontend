@@ -32,6 +32,29 @@ export interface MenuItemResponse {
   storeId: number;
   createdAt: string;
   updatedAt: string;
+  /** Set on a save response when the change was sent to Strike for approval instead of applied. */
+  pendingApproval?: boolean;
+  changeRequestId?: number;
+  /** A change to this item that is waiting for Strike's approval. */
+  pendingChange?: MenuChange;
+}
+
+export type MenuChangeAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'IMAGE';
+export type MenuChangeStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN';
+
+/** A menu change this store asked for, as Strike sees it. */
+export interface MenuChange {
+  id: number;
+  itemId: number | null;
+  action: MenuChangeAction;
+  status: MenuChangeStatus;
+  itemName: string | null;
+  changes: Partial<CreateMenuItemRequest>;
+  requestedByType?: 'OWNER' | 'MANAGER';
+  requestedByName?: string | null;
+  reviewNote?: string | null;
+  createdAt: string | null;
+  reviewedAt: string | null;
 }
 
 export interface CreateMenuItemRequest {

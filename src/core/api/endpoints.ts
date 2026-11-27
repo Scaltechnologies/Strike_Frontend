@@ -62,6 +62,10 @@ const endpoints = {
     items:             '/api/menu/items',
     item:              (itemId: number) => `/api/menu/items/${itemId}`,
     itemsByCategory:   (categoryId: number) => `/api/menu/items/by-category/${categoryId}`,
+    // Menu changes waiting for Strike's approval (when the admin has approval turned on).
+    changes:           '/api/menu/changes',
+    change:            (requestId: number) => `/api/menu/changes/${requestId}`,
+    changesPolicy:     '/api/menu/changes/policy',
   },
 
   // ── Card Management ────────────────────────────────────────────────
