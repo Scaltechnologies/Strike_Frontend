@@ -1,9 +1,11 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View, TouchableOpacity, FlatList, StyleSheet,
-  StatusBar, Switch, Image, Modal, ScrollView, Animated,
-  Platform, KeyboardAvoidingView, Share, RefreshControl, ActivityIndicator,
+  StatusBar, Switch, Image, Modal, ScrollView, Animated, Easing, Keyboard,
+  Share, RefreshControl, ActivityIndicator, useWindowDimensions,
+  TextInput as NativeTextInput,
 } from 'react-native';
+import { useKeyboardOverlap } from '../../../modules/menu/hooks/useKeyboardOverlap';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -279,6 +281,10 @@ interface ItemFormProps {
   onClose: () => void;
 }
 
+// Smallest the item form sheet gets when a tall keyboard is up on a small phone
+// (header + action buttons + a little of the form, which scrolls).
+const SHEET_MIN_HEIGHT = 240;
+
 // Category context is never re-asked from scratch: it's always shown as a
 // pre-filled "Curries ✓ · Change" summary (defaultCategoryId → last category
 // the vendor used this session → first category), never a blank required
@@ -296,11 +302,56 @@ function ItemFormModal({
   const [available, setAvailable] = useState(true);
   const [catPickerOpen, setCatPickerOpen] = useState(false);
   const [saving, setSaving]       = useState(false);
+  // Synchronous guard: `saving` state only disables the buttons after the next
+  // render, so a fast double tap could otherwise submit the same item twice.
+  const savingRef = useRef(false);
   const nameRef = useRef<RNTextInput>(null);
   const { alert, AlertView } = useAppAlert();
 
+  // ── Sheet geometry & motion (see useKeyboardOverlap for the why) ──
+  // The sheet's TOP edge is fixed at 15% of the screen; only its bottom edge
+  // follows the keyboard, in one step per keyboard show/hide. Nothing is a
+  // percentage of a container that itself changes with the keyboard.
+  const { height: windowH } = useWindowDimensions();
+  const rootRef = useRef<View>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const [rootH, setRootH] = useState(windowH);
+  const [baseH, setBaseH] = useState(windowH);
+  const [mounted, setMounted] = useState(visible);
+  const anim = useRef(new Animated.Value(0)).current;
+  const kbOverlap = useKeyboardOverlap(rootRef, mounted);
+  const sheetTop = Math.round(baseH * 0.15);
+  const sheetHeight = Math.max(SHEET_MIN_HEIGHT, rootH - kbOverlap - sheetTop);
+
+  // Open: mount the Modal, then fade the backdrop in and slide only the sheet up
+  // (animationType="slide" moved the whole dimmed screen up from the bottom).
+  // Close: reverse, then unmount. Native-driver opacity/transform — no relayout.
   useEffect(() => {
     if (visible) {
+      setMounted(true);
+    } else if (mounted) {
+      Animated.timing(anim, {
+        toValue: 0, duration: 200, easing: Easing.in(Easing.cubic), useNativeDriver: true,
+      }).start(({ finished }) => { if (finished) setMounted(false); });
+    }
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Animate in only once the Modal's views exist, so the first frame is the
+  // hidden state rather than a flash of the final position.
+  useEffect(() => {
+    if (!visible || !mounted) return;
+    anim.setValue(0);
+    Animated.timing(anim, {
+      toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+    }).start();
+  }, [visible, mounted, anim]);
+
+  // Reset the fields only when the sheet OPENS — not whenever a parent re-render
+  // hands in new props while the vendor is typing.
+  const wasVisible = useRef(false);
+  useEffect(() => {
+    if (visible && !wasVisible.current) {
+      Keyboard.dismiss(); // e.g. the Menu search box — the sheet starts keyboard-free
       setName(initial?.name ?? '');
       setPrice(initial?.price != null ? String(initial.price) : '');
       setDesc(initial?.description ?? '');
@@ -308,8 +359,37 @@ function ItemFormModal({
       setItemType(initial?.itemType);
       setAvailable((initial?.availabilityStatus ?? 'AVAILABLE') === 'AVAILABLE');
       setSaving(false);
+      savingRef.current = false;
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
     }
+    wasVisible.current = visible;
   }, [visible, initial, categories, defaultCategoryId]);
+
+  // When the keyboard opens (or changes height), keep the focused field in view
+  // inside the now-shorter scroll area — scroll only if it's actually hidden.
+  const scrollOffset = useRef(0);
+  const scrollViewportH = useRef(0);
+  useEffect(() => {
+    if (!kbOverlap) return;
+    const frame = requestAnimationFrame(() => {
+      const input = NativeTextInput.State.currentlyFocusedInput?.();
+      const inner = (scrollRef.current as unknown as { getInnerViewRef?: () => View | null } | null)
+        ?.getInnerViewRef?.();
+      if (!input || !inner) return;
+      input.measureLayout(
+        inner,
+        (_x, y, _w, h) => {
+          const top = scrollOffset.current;
+          const bottom = top + scrollViewportH.current;
+          if (y >= top && y + h <= bottom) return;
+          const target = y < top ? y - 12 : y + h - scrollViewportH.current + 12;
+          scrollRef.current?.scrollTo({ y: Math.max(0, target), animated: true });
+        },
+        () => {},
+      );
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [kbOverlap]);
 
   // Clears everything except the category (and re-focuses Name) so adding a
   // run of items to the same category — e.g. four curries in a row — never
@@ -324,6 +404,7 @@ function ItemFormModal({
   }, []);
 
   const doSave = async (addAnother: boolean) => {
+    if (savingRef.current) return;
     if (!name.trim()) { alert('Required', 'Item name is required.'); return; }
     if (!categoryId)  { alert('Required', 'Please select a category.'); return; }
     if (!itemType)    { alert('Required', 'Please select Veg or Non-Veg.'); return; }
@@ -342,6 +423,7 @@ function ItemFormModal({
       availabilityStatus: available ? 'AVAILABLE' : 'OUT_OF_STOCK',
     };
 
+    savingRef.current = true;
     setSaving(true);
     try {
       initial ? await onEdit(initial.id, payload) : await onCreate(payload);
@@ -355,6 +437,7 @@ function ItemFormModal({
     } catch (err) {
       alert('Error', getUserMessage(err, 'Failed to save item — please try again.'));
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -363,26 +446,45 @@ function ItemFormModal({
 
   return (
     <>
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={mounted}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      navigationBarTranslucent
+      onRequestClose={onClose}
+    >
       {/*
        * Non-interactive veil — user must tap Cancel to close (no accidental
-       * dismiss while filling the form).
+       * dismiss while filling the form). Fades in; never moves.
        */}
-      <View style={[StyleSheet.absoluteFill, styles.veil]} pointerEvents="none" />
+      <Animated.View style={[StyleSheet.absoluteFill, styles.veil, { opacity: anim }]} pointerEvents="none" />
 
       {/*
-       * KAV (flex:1, justifyContent:'flex-end', behavior='padding'):
-       * - fills the screen so flex math works correctly
-       * - sheet is a normal flow child aligned to flex-end
-       * - when keyboard appears, KAV adds paddingBottom = keyboardHeight,
-       *   pushing the sheet bottom to sit exactly above the keyboard
-       * - works reliably on both iOS and Android inside a Modal
+       * Full-screen root, measured once per layout. The sheet sits at its
+       * bottom with a fixed top edge (see sheetHeight); when the keyboard is
+       * up, marginBottom lifts the sheet's bottom edge to just above it.
        */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.kavContainer}
+      <View
+        ref={rootRef}
+        style={styles.formRoot}
+        onLayout={e => {
+          const h = Math.round(e.nativeEvent.layout.height);
+          setRootH(h);
+          if (kbOverlap === 0) setBaseH(prev => Math.max(prev, h));
+        }}
       >
-        <View style={styles.formSheet}>
+        <Animated.View
+          style={[
+            styles.formSheet,
+            { height: sheetHeight, marginBottom: kbOverlap },
+            {
+              transform: [{
+                translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [sheetHeight + 40, 0] }),
+              }],
+            },
+          ]}
+        >
           <View style={styles.sheetHandle} />
 
           <View style={styles.formHeader}>
@@ -402,10 +504,14 @@ function ItemFormModal({
            * This makes every field reachable by scrolling while keyboard is open.
            */}
           <ScrollView
+            ref={scrollRef}
             style={{ flex: 1 }}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingBottom: 8 }}
+            onScroll={e => { scrollOffset.current = e.nativeEvent.contentOffset.y; }}
+            scrollEventThrottle={32}
+            onLayout={e => { scrollViewportH.current = e.nativeEvent.layout.height; }}
           >
             {/* Category — always a pre-filled summary, never a blank picker.
                 Tapping it opens the shared CategorySelectorSheet; the vendor
@@ -544,8 +650,8 @@ function ItemFormModal({
               </TouchableOpacity>
             </View>
           )}
-        </View>
-      </KeyboardAvoidingView>
+        </Animated.View>
+      </View>
     </Modal>
 
     <CategorySelectorSheet
@@ -1279,12 +1385,8 @@ const styles = StyleSheet.create({
   // Shared modal backdrop
   veil: { backgroundColor: 'rgba(0,0,0,0.45)' },
 
-  // KAV container used by both item and category form modals.
-  // iOS:     behavior='padding' — adds paddingBottom = keyboardHeight.
-  // Android: behavior='height' — sets explicit height = windowH - keyboardH.
-  //          Requires softwareKeyboardLayoutMode:'resize' in app.json so the
-  //          Android window actually shrinks when the keyboard opens.
-  kavContainer: {
+  // Full-screen root of the item form Modal; the sheet is its bottom-aligned child.
+  formRoot: {
     flex: 1,
     justifyContent: 'flex-end',
   },
@@ -1302,12 +1404,10 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  // Item form sheet — normal flow child of KAV (NOT position:absolute).
-  // height:'85%' gives the sheet a definite size so ScrollView(flex:1) inside
-  // can measure itself and fill the space. maxHeight alone does NOT work because
-  // it is a constraint, not a measured height — flex:1 children collapse inside it.
+  // Item form sheet — bottom-aligned child of formRoot. Its height is set
+  // inline in pixels (ItemFormModal → sheetHeight): a definite size so the
+  // ScrollView(flex:1) inside can fill it, with a top edge that never moves.
   formSheet: {
-    height: '85%',
     backgroundColor: DS.surface,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
