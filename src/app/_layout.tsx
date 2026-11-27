@@ -6,6 +6,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { MaintenanceGate } from '../core/maintenance/MaintenanceGate';
 import { MANROPE_FONTS } from '../core/theme/fonts';
 import AppErrorScreen from '../components/AppErrorScreen';
+import { LaunchUpdateGate } from '../core/updates/LaunchUpdateGate';
 
 // Any screen that throws while rendering shows this instead of a blank white
 // screen (React unmounts everything on an uncaught render error in release).
@@ -25,15 +26,19 @@ export default function RootLayout() {
   }
 
   return (
-    <MaintenanceGate>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="change-pin" />
-        <Stack.Screen name="terms" />
-        <Stack.Screen name="privacy-policy" />
-        <Stack.Screen name="account-deletion" />
-      </Stack>
-    </MaintenanceGate>
+    // Applies a newly published app update before anything is shown, so every
+    // vendor (incl. a fresh Play Store install) sees the current screens.
+    <LaunchUpdateGate>
+      <MaintenanceGate>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="change-pin" />
+          <Stack.Screen name="terms" />
+          <Stack.Screen name="privacy-policy" />
+          <Stack.Screen name="account-deletion" />
+        </Stack>
+      </MaintenanceGate>
+    </LaunchUpdateGate>
   );
 }
